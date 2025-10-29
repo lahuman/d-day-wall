@@ -1,0 +1,22 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model DDayTile {
+  id          String   @id @default(uuid())
+  title       String
+  target_date DateTime
+  coord_x     Int
+  coord_y     Int
+  created_at  DateTime @default(now())
+
+  @@unique([coord_x, coord_y])
+}

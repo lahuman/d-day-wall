@@ -1,0 +1,60 @@
+import prisma from '$lib/server/prisma';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+
+// GET /api/tiles
+export const GET: RequestHandler = async () => {
+  try {
+    const tiles = await prisma.dDayTile.findMany();
+    return json(tiles);
+  } catch (error) {
+    console.error('Failed to fetch tiles:', error);
+    return json({ message: 'Failed to fetch tiles' }, { status: 500 });
+  }
+};
+
+// POST /api/tiles
+export const POST: RequestHandler = async ({ request }) => {
+  try {
+    const { title, target_date, coord_x, coord_y } = await request.json();
+
+    // --- Validation ---
+    if (!title || !target_date || coord_x === undefined || coord_y === undefined) {
+      return json({ message: 'Missing required fields' }, { status: 400 });
+    }
+
+    const targetDate = new Date(target_date);
+    const now = new Date();
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(now.getFullYear() + 1);
+
+    if (targetDate <= now) {
+      return json({ message: 'Target date must be in the future' }, { status: 400 });
+    }
+
+    if (targetDate > oneYearFromNow) {
+      return json({ message: 'Target date cannot be more than one year from now' }, { status: 400 });
+    }
+    // --- End Validation ---
+
+    const newTile = await prisma.dDayTile.create({
+      data: {
+        title,
+        target_date: targetDate,
+        coord_x,
+        coord_y,
+      },
+    });
+
+    return json(newTile, { status: 201 });
+
+  } catch (error: any) {
+    // Prisma unique constraint violation
+    if (error.code === 'P2002') {
+      return json({ message: 'Coordinates already taken' }, { status: 409 }); // 409 Conflict
+    }
+
+    console.error('Failed to create tile:', error);
+    return json({ message: 'Failed to create tile' }, { status: 500 });
+  }
+};
