@@ -12,11 +12,10 @@
     created_at: string;
   };
 
-  // --- New Design Constants ---
   const GRID_COUNT = 60;
-  const TILE_BODY_SIZE = 100; // New base size
+  const TILE_BODY_SIZE = 100;
   const TILE_MARGIN = 2;
-  const TILE_CELL_SIZE = TILE_BODY_SIZE + TILE_MARGIN; // Total space for one tile
+  const TILE_CELL_SIZE = TILE_BODY_SIZE + TILE_MARGIN;
   const WALL_WIDTH = GRID_COUNT * TILE_CELL_SIZE;
   const WALL_HEIGHT = GRID_COUNT * TILE_CELL_SIZE;
   const SCALE_BY = 1.1;
@@ -26,6 +25,13 @@
   let tileNodes = new Map<string, Konva.Rect>();
   let stage: Konva.Stage;
   let layer: Konva.Layer;
+
+  // --- Final, Working HTML Tooltip State ---
+  let tooltip = { visible: false, content: '', x: 0, y: 0, dummy: 0 };
+
+  let isTooltipVisibleByTouch = false;
+
+  
 
   let showModal = false;
   let isSubmitting = false;
@@ -38,13 +44,10 @@
   function calculateDday(targetDateStr: string): string {
     const targetDate = new Date(targetDateStr);
     const today = new Date();
-    // Reset time part to compare dates only
     today.setHours(0, 0, 0, 0);
     targetDate.setHours(0, 0, 0, 0);
-
     const diffTime = targetDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
     if (diffDays === 0) return 'D-Day';
     if (diffDays > 0) return `D-${diffDays}`;
     return `D+${Math.abs(diffDays)}`;
@@ -81,6 +84,7 @@
   }
 
   function drawTile(tile: DDayTile) {
+    console.log(`Attaching listeners for tile: ${tile.title}`);
     const group = new Konva.Group({ 
       x: tile.coord_x * TILE_CELL_SIZE + TILE_MARGIN / 2,
       y: tile.coord_y * TILE_CELL_SIZE + TILE_MARGIN / 2,
@@ -91,6 +95,7 @@
     const titleFontSize = 14;
     const titleLineHeight = 1.2;
     const maxLines = 3;
+    const maxHeight = maxLines * titleFontSize * titleLineHeight;
 
     const titleText = new Konva.Text({ 
       text: tile.title,
@@ -102,17 +107,58 @@
       y: 10,
       align: 'center',
       lineHeight: titleLineHeight,
-      height: maxLines * titleFontSize * titleLineHeight,
-      ellipsis: true, // Apply ellipsis if text overflows the height
+      height: maxHeight,
+      ellipsis: true,
     });
+
     const dDayText = new Konva.Text({ text: calculateDday(tile.target_date), fontSize: 20, fontStyle: 'bold', fill: '#333', width: TILE_BODY_SIZE, y: 65, align: 'center' });
 
     group.add(tileRect, titleText, dDayText);
     layer.add(group);
+
+    // --- Final Working Tooltip Logic ---
+    group.on('mouseover click tap', (e) => {
+      console.log(`Tooltip shown for tile: ${tile.title}`, e.type);
+      e.cancelBubble = true;
+      if (e.type === 'tap') {
+        isTooltipVisibleByTouch = true;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const pos = e.evt.touches && e.evt.touches.length > 0 ? e.evt.touches[0] : e.evt;
+
+      tooltip = {
+        visible: true,
+        content: tile.title,
+        x: pos.clientX - containerRect.left + 5,
+        y: pos.clientY - containerRect.top + 5,
+        dummy: Math.random(),
+      };
+    });
+
+    group.on('mouseout', (e) => {
+      console.log(`Tooltip hidden for tile: ${tile.title}`, e.type);
+      if (e.type === 'mouseout' && !isTooltipVisibleByTouch) {
+        tooltip = { ...tooltip, visible: false, dummy: Math.random() };
+      }
+    });
   }
 
   function handleWallClick(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    console.log('Wall clicked', e.target.getClassName());
+
+    if (isTooltipVisibleByTouch) {
+      isTooltipVisibleByTouch = false;
+      tooltip = { ...tooltip, visible: false, dummy: Math.random() };
+      return;
+    }
+
+    if (e.target.getClassName() === 'Group') {
+      return;
+    }
+
     if (showModal) return;
+
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
     const transform = e.target.getStage()?.getAbsoluteTransform().copy()?.invert();
@@ -120,15 +166,15 @@
     const { x, y } = transform.point(pos);
     const coord_x = Math.floor(x / TILE_CELL_SIZE);
     const coord_y = Math.floor(y / TILE_CELL_SIZE);
-
     if (coord_x < 0 || coord_x >= GRID_COUNT || coord_y < 0 || coord_y >= GRID_COUNT) return;
     if (tiles.some(t => t.coord_x === coord_x && t.coord_y === coord_y)) {
-      alert('This spot is already taken!');
       return;
     }
     selectedCoords = { x: coord_x, y: coord_y };
     showModal = true;
   }
+
+
 
   async function handleModalSubmit(event: CustomEvent<{ title: string; target_date: string }>) {
     if (!selectedCoords) return;
@@ -170,6 +216,7 @@
     stage = new Konva.Stage({ container, width: window.innerWidth, height: window.innerHeight, draggable: true });
     layer = new Konva.Layer();
     stage.add(layer);
+
     const wallBackground = new Konva.Rect({ x: 0, y: 0, width: WALL_WIDTH, height: WALL_HEIGHT, fill: '#f0f0f0' });
     layer.add(wallBackground);
     wallBackground.on('click tap', handleWallClick);
@@ -222,7 +269,13 @@
     sparkleAnimation = new Konva.Animation(frame => {
       if (!frame) return;
       const brightness = 0.15 * Math.sin(frame.time * 2 * Math.PI / 2000) + 0.85;
-      dDayNodes.forEach(node => node.fillRGB({ r: 173 * brightness, g: 216 * brightness, b: 230 * brightness }));
+      const r = Math.round(173 * brightness);
+      const g = Math.round(216 * brightness);
+      const b = Math.round(230 * brightness);
+      const newColor = `rgb(${r}, ${g}, ${b})`;
+      dDayNodes.forEach(node => {
+        node.fill(newColor);
+      });
     }, layer);
     sparkleAnimation.start();
     intervalId = setInterval(updateDDayTiles, 60000);
@@ -236,11 +289,32 @@
 
 <main>
   <div bind:this={container} class="konva-container" />
+
+  <!-- HTML Tooltip -->
+  {#if tooltip.visible}
+    <div 
+      class="absolute bg-black text-white text-sm rounded py-1 px-2 shadow-lg pointer-events-none z-50"
+      style="top: {tooltip.y}px; left: {tooltip.x}px;"
+    >
+      {tooltip.content}
+    </div>
+  {/if}
+
+
+  
   <div class="fixed top-4 right-4 flex flex-col space-y-2 z-10">
     <button on:click={zoomIn} class="w-10 h-10 bg-gray-700 text-white text-xl font-bold rounded-full shadow-lg hover:bg-gray-600">+</button>
     <button on:click={zoomOut} class="w-10 h-10 bg-gray-700 text-white text-xl font-bold rounded-full shadow-lg hover:bg-gray-600">-</button>
   </div>
-  <RegistrationModal bind:show={showModal} bind:isSubmitting coord_x={selectedCoords?.x} coord_y={selectedCoords?.y} on:close={closeModal} on:submit={handleModalSubmit} />
+
+  <RegistrationModal 
+    bind:show={showModal} 
+    bind:isSubmitting 
+    coord_x={selectedCoords?.x} 
+    coord_y={selectedCoords?.y} 
+    on:close={closeModal} 
+    on:submit={handleModalSubmit} 
+  />
 </main>
 
 <style>
