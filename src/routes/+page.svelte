@@ -13,6 +13,7 @@
     coord_x: number;
     coord_y: number;
     color: string;
+    likes: number;
     created_at: string;
   };
 
@@ -130,9 +131,14 @@
     });
 
     const dDayString = isDDay ? 'D-Day!' : diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
-    const dDayText = new Konva.Text({ text: dDayString, fontSize: 20, fontStyle: 'bold', fill: isDDay || diffDays < 0 ? '#000' : '#fff', width: TILE_BODY_SIZE, y: 65, align: 'center' });
+    const dDayText = new Konva.Text({ text: dDayString, fontSize: 16, fontStyle: 'bold', fill: isDDay || diffDays < 0 ? '#000' : '#fff', width: TILE_BODY_SIZE - 10, x: 5, y: TILE_BODY_SIZE - 45, align: 'left' });
 
-    group.add(tileRect, titleText, dDayText);
+    const likeIcon = new Konva.Text({ text: '❤', fontSize: 16, fill: '#ff0000', x: TILE_BODY_SIZE - 55, y: TILE_BODY_SIZE - 5 });
+    const likeCount = new Konva.Text({ text: String(tile.likes), fontSize: 16, fontStyle: 'bold', fill: isDDay || diffDays < 0 ? '#000' : '#fff', x: TILE_BODY_SIZE - 35, y: TILE_BODY_SIZE - 5 });
+
+    likeIcon.on('click tap', () => handleLike(tile, likeCount));
+
+    group.add(tileRect, titleText, dDayText, likeIcon, likeCount);
     layer.add(group);
 
     group.on('mouseover click tap', (e) => {
@@ -159,6 +165,31 @@
         tooltip = { ...tooltip, visible: false, dummy: Math.random() };
       }
     });
+  }
+
+  async function handleLike(tile: DDayTile, likeCount: Konva.Text) {
+    const likedTiles = JSON.parse(localStorage.getItem('likedTiles') || '[]');
+    if (likedTiles.includes(tile.id)) {
+      infoModalTitle = '알림';
+      infoModalMessage = '이미 좋아한 타일입니다.';
+      showInfoModal = true;
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/tiles/${tile.id}/like`, { method: 'POST' });
+      if (!response.ok) {
+        throw new Error('좋아요에 실패했습니다.');
+      }
+
+      const updatedTile: DDayTile = await response.json();
+      likeCount.text(String(updatedTile.likes));
+      localStorage.setItem('likedTiles', JSON.stringify([...likedTiles, tile.id]));
+    } catch (error: any) {
+      infoModalTitle = '오류';
+      infoModalMessage = error.message;
+      showInfoModal = true;
+    }
   }
 
   let isRandomPlacement = false;
