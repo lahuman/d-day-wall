@@ -18,8 +18,8 @@
   };
 
   const GRID_COUNT = 60;
-  const TILE_BODY_SIZE = 100;
-  const TILE_MARGIN = 2;
+  const TILE_BODY_SIZE = 150;
+  const TILE_MARGIN = 20;
   const TILE_CELL_SIZE = TILE_BODY_SIZE + TILE_MARGIN;
   const WALL_WIDTH = GRID_COUNT * TILE_CELL_SIZE;
   const WALL_HEIGHT = GRID_COUNT * TILE_CELL_SIZE;
@@ -43,7 +43,7 @@
   let infoModalTitle = '';
   let infoModalMessage = '';
 
-  let dDayNodes: Konva.Rect[] = [];
+  let dDayNodes: Konva.Group[] = [];
   let sparkleAnimation: Konva.Animation | null = null;
   let intervalId: ReturnType<typeof setInterval>;
 
@@ -83,70 +83,145 @@
   }
 
   function updateDDayTiles() {
-    dDayNodes = [];
+    const newDDayNodes: Konva.Group[] = [];
     tiles.forEach(tile => {
       const node = tileNodes.get(tile.id);
       if (node) {
+        const group = node.getParent();
         const diffDays = calculateDday(tile.target_date);
-        if (diffDays === 0) {
-          dDayNodes.push(node);
-          node.setAttr('isDDay', true);
-        } else {
-          node.setAttr('isDDay', false);
+        const wasDDay = group.getAttr('isDDay');
+        const isDDay = diffDays === 0;
+
+        if (isDDay) {
+          newDDayNodes.push(group);
         }
+        
+        if (wasDDay && !isDDay) {
+          // No longer D-Day, reset state
+          group.scale({ x: 1, y: 1 });
+          group.opacity(1);
+          // Reset shadow
+          const tileRect = node as Konva.Rect;
+          tileRect.shadowBlur(10);
+          tileRect.shadowColor('rgba(0,0,0,0.1)');
+        }
+        
+        group.setAttr('isDDay', isDDay);
       }
     });
+    dDayNodes = newDDayNodes;
   }
 
   function drawTile(tile: DDayTile) {
-    const group = new Konva.Group({ 
+    const diffDays = calculateDday(tile.target_date);
+    const isDDay = diffDays === 0;
+    const isPast = diffDays < 0;
+
+    const group = new Konva.Group({
       x: tile.coord_x * TILE_CELL_SIZE + TILE_MARGIN / 2,
       y: tile.coord_y * TILE_CELL_SIZE + TILE_MARGIN / 2,
+      opacity: isPast ? 0.7 : 1
     });
 
-    const diffDays = calculateDday(tile.target_date);
-    const tileColor = diffDays < 0 ? '#E5E7EB' : tile.color;
-    const isDDay = diffDays === 0;
+    group.setAttr('isDDay', isDDay);
 
-    const tileRect = new Konva.Rect({ width: TILE_BODY_SIZE, height: TILE_BODY_SIZE, fill: tileColor, stroke: isDDay ? '#fde047' : '#ddd', strokeWidth: isDDay ? 2 : 1, cornerRadius: 4 });
-    tileNodes.set(tile.id, tileRect);
-
-    const titleFontSize = 14;
-    const titleLineHeight = 1.2;
-    const maxLines = 3;
-    const maxHeight = maxLines * titleFontSize * titleLineHeight;
-
-    const titleText = new Konva.Text({ 
-      text: tile.title,
-      fontSize: titleFontSize, 
-      fontStyle: 'bold', 
-      fill: isDDay || diffDays < 0 ? '#000' : '#fff', 
-      width: TILE_BODY_SIZE - 10,
-      x: 5,
-      y: 10,
-      align: 'center',
-      lineHeight: titleLineHeight,
-      height: maxHeight,
-      ellipsis: true,
+        const tileRect = new Konva.Rect({
+          width: TILE_BODY_SIZE,
+          height: TILE_BODY_SIZE,
+          fill: tile.color,
+          cornerRadius: 12,
+          shadowColor: 'rgba(0,0,0,0.1)',
+          shadowBlur: 10,
+          shadowOffset: { x: 0, y: 4 },
+          shadowOpacity: 1
+        });
+        tileNodes.set(tile.id, tileRect);
+    
+        const titleText = new Konva.Text({
+          text: tile.title,
+          fontSize: 14,
+          fontFamily: 'Noto Sans KR, sans-serif',
+          fontStyle: '700',
+          fill: '#555',
+          width: TILE_BODY_SIZE - 24,
+          x: 12,
+          y: 12,
+          lineHeight: 1.4,
+          ellipsis: true,
+        });
+    
+        const dDayString = isDDay ? 'D-Day' : diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
+        let dDayColor = '#007bff';
+        if (isDDay) dDayColor = '#e74c3c';
+        if (diffDays < 0) dDayColor = '#868e96';
+    
+        const dDayText = new Konva.Text({
+          text: dDayString,
+          fontSize: 36,
+          fontFamily: 'Noto Sans KR, sans-serif',
+          fontStyle: '900',
+          fill: dDayColor,
+          width: TILE_BODY_SIZE - 24,
+          x: 12,
+          y: titleText.y() + titleText.height() + 4
+        });
+    
+        const likeButtonGroup = new Konva.Group({
+          x: TILE_BODY_SIZE - 60 - 12,
+          y: TILE_BODY_SIZE - 24 - 12,
+        });
+    
+        const liked = JSON.parse(localStorage.getItem('likedTiles') || '[]').includes(tile.id);
+    
+        const likeButtonRect = new Konva.Rect({
+          width: 60,
+          height: 24,
+          fill: liked ? '#fff0f0' : '#f1f3f5',
+          cornerRadius: 20,
+        });
+    
+        const heartIcon = new Konva.Path({
+          data: 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z',
+          scale: { x: 0.5, y: 0.5 },
+          x: 8,
+          y: 5,
+          fill: liked ? '#e74c3c' : 'none',
+          stroke: liked ? '#e74c3c' : '#868e96',
+          strokeWidth: 2.5,
+        });
+    
+        const likeCount = new Konva.Text({
+          text: String(tile.likes),
+          fontSize: 13,
+          fontFamily: 'Noto Sans KR, sans-serif',
+          fontStyle: '700',
+          fill: liked ? '#e74c3c' : '#555',
+          x: 8 + 14 + 4,
+          y: 5,
+        });
+    likeButtonGroup.add(likeButtonRect, heartIcon, likeCount);
+    likeButtonGroup.on('click tap', (e) => {
+      e.cancelBubble = true;
+      handleLike(tile, likeCount, heartIcon, likeButtonRect);
     });
 
-    const dDayString = isDDay ? 'D-Day!' : diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
-    const dDayText = new Konva.Text({ text: dDayString, fontSize: 16, fontStyle: 'bold', fill: isDDay || diffDays < 0 ? '#000' : '#fff', width: TILE_BODY_SIZE - 10, x: 5, y: TILE_BODY_SIZE - 45, align: 'left' });
-
-    const likeIcon = new Konva.Text({ text: '❤', fontSize: 16, fill: '#ff0000', x: TILE_BODY_SIZE - 55, y: TILE_BODY_SIZE - 5 });
-    const likeCount = new Konva.Text({ text: String(tile.likes), fontSize: 16, fontStyle: 'bold', fill: isDDay || diffDays < 0 ? '#000' : '#fff', x: TILE_BODY_SIZE - 35, y: TILE_BODY_SIZE - 5 });
-
-    likeIcon.on('click tap', () => handleLike(tile, likeCount));
-
-    group.add(tileRect, titleText, dDayText, likeIcon, likeCount);
+    group.add(tileRect, titleText, dDayText, likeButtonGroup);
     layer.add(group);
 
-    group.on('mouseover click tap', (e) => {
-      e.cancelBubble = true;
-      if (e.type === 'tap') {
-        isTooltipVisibleByTouch = true;
-      }
+    group.on('mouseover', (e) => {
+      stage.container().style.cursor = 'pointer';
+      group.to({
+        scaleX: 1.03,
+        scaleY: 1.03,
+        duration: 0.2
+      });
+      tileRect.to({
+        shadowBlur: 20,
+        duration: 0.2
+      });
 
+      // Tooltip logic
+      e.cancelBubble = true;
       const containerRect = container.getBoundingClientRect();
       const pos = e.evt.changedTouches ? e.evt.changedTouches[0] : e.evt;
 
@@ -161,13 +236,42 @@
     });
 
     group.on('mouseout', (e) => {
+      stage.container().style.cursor = 'grab';
+      group.to({
+        scaleX: 1,
+        scaleY: 1,
+        duration: 0.2
+      });
+      tileRect.to({
+        shadowBlur: 10,
+        duration: 0.2
+      });
+
+      // Tooltip logic
       if (e.type === 'mouseout' && !isTooltipVisibleByTouch) {
         tooltip = { ...tooltip, visible: false, dummy: Math.random() };
       }
     });
+
+    group.on('tap', (e) => {
+      e.cancelBubble = true;
+      const containerRect = container.getBoundingClientRect();
+      const touch = e.evt.changedTouches ? e.evt.changedTouches[0] : null;
+      if (!touch) return;
+
+      resetInactivityTimer();
+      tooltip = {
+        visible: true,
+        content: tile.title,
+        x: touch.clientX - containerRect.left + 5,
+        y: touch.clientY - containerRect.top + 5,
+        dummy: Math.random(),
+      };
+      isTooltipVisibleByTouch = true;
+    });
   }
 
-  async function handleLike(tile: DDayTile, likeCount: Konva.Text) {
+  async function handleLike(tile: DDayTile, likeCount: Konva.Text, heartIcon: Konva.Path, likeButtonRect: Konva.Rect) {
     const likedTiles = JSON.parse(localStorage.getItem('likedTiles') || '[]');
     if (likedTiles.includes(tile.id)) {
       infoModalTitle = '알림';
@@ -185,6 +289,12 @@
       const updatedTile: DDayTile = await response.json();
       likeCount.text(String(updatedTile.likes));
       localStorage.setItem('likedTiles', JSON.stringify([...likedTiles, tile.id]));
+
+      likeButtonRect.fill('#fff0f0');
+      heartIcon.fill('#e74c3c');
+      heartIcon.stroke('#e74c3c');
+      likeCount.fill('#e74c3c');
+
     } catch (error: any) {
       infoModalTitle = '오류';
       infoModalMessage = error.message;
@@ -311,6 +421,49 @@
     }, 30000);
   }
 
+  let isDraggingMinimap = false;
+  let lastMinimapDragPos = { x: 0, y: 0 };
+
+  function onMinimapDragStart(e: MouseEvent | TouchEvent) {
+    isDraggingMinimap = true;
+    const pos = 'touches' in e ? e.touches[0] : e;
+    lastMinimapDragPos = { x: pos.clientX, y: pos.clientY };
+
+    window.addEventListener('mousemove', onMinimapDragMove);
+    window.addEventListener('mouseup', onMinimapDragEnd, { once: true });
+    window.addEventListener('touchmove', onMinimapDragMove, { passive: false });
+    window.addEventListener('touchend', onMinimapDragEnd, { once: true });
+  }
+
+  function onMinimapDragMove(e: MouseEvent | TouchEvent) {
+    if (!isDraggingMinimap || !stage) return;
+    e.preventDefault();
+
+    const pos = 'touches' in e ? e.touches[0] : e;
+    const dx = pos.clientX - lastMinimapDragPos.x;
+    const dy = pos.clientY - lastMinimapDragPos.y;
+    lastMinimapDragPos = { x: pos.clientX, y: pos.clientY };
+
+    const minimapWidth = 192;
+    const minimapHeight = 192;
+    const scale = stage.scaleX();
+
+    const stageDx = -(dx / minimapWidth) * WALL_WIDTH * scale;
+    const stageDy = -(dy / minimapHeight) * WALL_HEIGHT * scale;
+
+    stage.x(stage.x() + stageDx);
+    stage.y(stage.y() + stageDy);
+    
+    stage.batchDraw();
+    updateMinimapViewport();
+  }
+
+  function onMinimapDragEnd() {
+    isDraggingMinimap = false;
+    window.removeEventListener('mousemove', onMinimapDragMove);
+    window.removeEventListener('touchmove', onMinimapDragMove);
+  }
+
   onMount(async () => {
     if (!container) return;
     stage = new Konva.Stage({ container, width: window.innerWidth, height: window.innerHeight, draggable: true });
@@ -391,13 +544,17 @@
 
     sparkleAnimation = new Konva.Animation(frame => {
       if (!frame) return;
-      dDayNodes.forEach(node => {
-        if (node.getAttr('isDDay')) {
-          const scale = 1 + 0.02 * Math.sin(frame.time * 2 * Math.PI / 1000);
-          node.scale({ x: scale, y: scale });
-          node.shadowColor('#fde047');
-          node.shadowBlur(10 + 10 * Math.sin(frame.time * 2 * Math.PI / 1500));
-          node.shadowOpacity(0.6 + 0.4 * Math.sin(frame.time * 2 * Math.PI / 1500));
+      dDayNodes.forEach(group => {
+        if (group.getAttr('isDDay')) {
+          const scale = 1 + 0.05 * Math.sin(frame.time * Math.PI / 750);
+          group.scale({ x: scale, y: scale });
+          group.opacity(0.5 + 0.5 * Math.sin(frame.time * Math.PI / 300)); // Faster blink
+          
+          const rect = group.findOne('Rect');
+          if (rect) {
+            rect.shadowColor('rgba(231, 76, 60, 0.5)');
+            rect.shadowBlur(20);
+          }
         }
       });
     }, layer);
@@ -454,7 +611,12 @@
         {#each tiles as tile}
           <div class="rounded-full" style="grid-column: {Math.floor(tile.coord_x / 2) + 1} / span 1; grid-row: {Math.floor(tile.coord_y / 2) + 1} / span 1; background-color: {tile.color};"></div>
         {/each}
-        <div class="absolute border-2 border-primary bg-primary/20" style="width: {minimapViewport.width}px; height: {minimapViewport.height}px; top: {minimapViewport.top}px; left: {minimapViewport.left}px;"></div>
+        <div 
+          class="absolute border-2 border-primary bg-primary/20 cursor-move" 
+          style="width: {minimapViewport.width}px; height: {minimapViewport.height}px; top: {minimapViewport.top}px; left: {minimapViewport.left}px;"
+          on:mousedown={onMinimapDragStart}
+          on:touchstart={onMinimapDragStart}
+        ></div>
       </div>
     </div>
     <div class="flex flex-col gap-0.5">
