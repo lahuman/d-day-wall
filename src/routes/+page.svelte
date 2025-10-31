@@ -125,7 +125,7 @@
       }
 
       const containerRect = container.getBoundingClientRect();
-      const pos = e.evt.touches && e.evt.touches.length > 0 ? e.evt.touches[0] : e.evt;
+      const pos = e.evt.changedTouches ? e.evt.changedTouches[0] : e.evt;
 
       tooltip = {
         visible: true,
@@ -288,7 +288,7 @@
 </script>
 
 <main>
-  <div bind:this={container} class="konva-container" />
+  <div bind:this={container} class="konva-container" ></div>
 
   <!-- HTML Tooltip -->
   {#if tooltip.visible}
