@@ -10,6 +10,7 @@
   export let target_date = '';
   let selectedColor = '#ef4444';
   let minDate: string;
+  let dateError: string | null = null;
 
   onMount(() => {
     const today = new Date();
@@ -32,10 +33,33 @@
   const dispatch = createEventDispatcher();
 
   function handleSubmit() {
+    dateError = null; // Clear previous errors
+
     if (!title || !target_date) {
       alert('모든 필드를 채워주세요.');
       return;
     }
+
+    const [year, month, day] = target_date.split('-').map(Number);
+    const selectedDate = new Date(year, month - 1, day);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(today.getFullYear() + 1);
+    oneYearFromNow.setHours(0, 0, 0, 0);
+
+    if (selectedDate <= today) {
+      dateError = 'D-Day는 오늘 이후의 날짜여야 합니다.';
+      return;
+    }
+
+    if (selectedDate > oneYearFromNow) {
+      dateError = 'D-Day는 1년 이내의 날짜여야 합니다.';
+      return;
+    }
+
     dispatch('submit', { title, target_date, color: selectedColor });
   }
 
@@ -56,7 +80,10 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-2" for="d-day-date">날짜</label>
-          <input class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="d-day-date" name="d-day-date" type="date" bind:value={target_date} min={minDate} />
+          <input class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="d-day-date" name="d-day-date" type="date" bind:value={target_date} min={minDate} on:input={() => dateError = null} />
+          {#if dateError}
+            <p class="text-red-500 text-sm mt-1">{dateError}</p>
+          {/if}
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-2">타일 색상</label>
@@ -70,11 +97,11 @@
           <p>D-Day는 익명으로 등록됩니다. 짧은 광고 시청 후 캔버스에 영구적으로 D-Day를 남길 수 있습니다.</p>
         </div>
         <div class="flex items-center gap-4 pt-4">
-          <button class="w-full flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-gray-200 text-gray-800 text-base font-bold leading-normal tracking-[0.015em] transition hover:bg-gray-300" type="button" on:click={handleClose}>
+          <button class="w-full flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 border border-gray-300 bg-transparent text-base font-bold leading-normal tracking-[0.015em] text-gray-800 transition hover:bg-gray-100" type="button" on:click={handleClose}>
             <span class="truncate">취소</span>
           </button>
-          <button class="w-full flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary text-background-dark text-base font-bold leading-normal tracking-[0.015em] transition hover:bg-primary/90" type="submit" disabled={isSubmitting}>
-            <span class="truncate">{isSubmitting ? '처리 중...' : '광고 보고 등록하기'}</span>
+          <button class="w-full flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-blue-600 text-white text-base font-bold leading-normal tracking-[0.015em] transition hover:bg-blue-700" type="submit" disabled={isSubmitting}>
+            <span class="truncate">{isSubmitting ? '처리 중...' : '등록하기'}</span>
           </button>
         </div>
       </form>

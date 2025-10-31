@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import Konva from 'konva';
   import RegistrationModal from '$lib/components/RegistrationModal.svelte';
+  import LoadingOverlay from '$lib/components/LoadingOverlay.svelte';
   import '../app.css';
 
   type DDayTile = {
@@ -23,6 +24,7 @@
   const SCALE_BY = 1.1;
 
   let container: HTMLDivElement;
+  let minimapElement: HTMLDivElement;
   let tiles: DDayTile[] = [];
   let tileNodes = new Map<string, Konva.Rect>();
   let stage: Konva.Stage;
@@ -40,6 +42,9 @@
   let intervalId: ReturnType<typeof setInterval>;
 
   let minimapViewport: { width: number; height: number; top: number; left: number } = { width: 0, height: 0, top: 0, left: 0 };
+
+  let showHelpText = true;
+  let inactivityTimer: ReturnType<typeof setTimeout>;
 
   function calculateDday(targetDateStr: string): number {
     const targetDate = new Date(targetDateStr);
@@ -134,6 +139,7 @@
       const containerRect = container.getBoundingClientRect();
       const pos = e.evt.changedTouches ? e.evt.changedTouches[0] : e.evt;
 
+      resetInactivityTimer();
       tooltip = {
         visible: true,
         content: tile.title,
@@ -163,6 +169,7 @@
   }
 
   function handleAddDDayClick() {
+    resetInactivityTimer();
     isRandomPlacement = true;
     selectedCoords = findRandomEmptyCell();
     showModal = true;
@@ -192,6 +199,7 @@
     if (tiles.some(t => t.coord_x === coord_x && t.coord_y === coord_y)) {
       return;
     }
+    resetInactivityTimer();
     isRandomPlacement = false;
     selectedCoords = { x: coord_x, y: coord_y };
     showModal = true;
@@ -256,6 +264,14 @@
     };
   }
 
+  function resetInactivityTimer() {
+    showHelpText = false;
+    clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      showHelpText = true;
+    }, 30000);
+  }
+
   onMount(async () => {
     if (!container) return;
     stage = new Konva.Stage({ container, width: window.innerWidth, height: window.innerHeight, draggable: true });
@@ -266,37 +282,53 @@
     layer.add(wallBackground);
     wallBackground.on('click tap', handleWallClick);
 
-    stage.on('wheel dragmove', (e) => {
-      e.evt.preventDefault();
-      if (e.type === 'wheel') {
-        zoomStage(e.evt.deltaY < 0, e.target.getStage()?.getPointerPosition());
-      } else {
-        updateMinimapViewport();
-      }
+    stage.on('dragmove', () => {
+      resetInactivityTimer();
+      updateMinimapViewport();
     });
 
+    const containerEl = stage.container();
+    containerEl.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      resetInactivityTimer();
+      zoomStage(e.deltaY < 0, stage.getPointerPosition());
+    }, { passive: false });
+
     let lastDist = 0;
-    function getDist(p1: {clientX: number, clientY: number}, p2: {clientX: number, clientY: number}) {
+    function getDist(p1: Touch, p2: Touch) {
         return Math.sqrt(Math.pow(p2.clientX - p1.clientX, 2) + Math.pow(p2.clientY - p1.clientY, 2));
     }
-    stage.on('touchmove', (e) => {
-        e.evt.preventDefault();
-        const t1 = e.evt.touches[0];
-        const t2 = e.evt.touches[1];
-        if (t1 && t2) {
-            const dist = getDist(t1, t2);
-            if (lastDist === 0) lastDist = dist;
-            const scale = stage.scaleX() * (dist / lastDist);
-            const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
-            const pointTo = { x: (center.x - stage.x()) / stage.scaleX(), y: (center.y - stage.y()) / stage.scaleX() };
-            stage.scale({ x: scale, y: scale });
-            stage.position({ x: center.x - pointTo.x * scale, y: center.y - pointTo.y * scale });
-            stage.batchDraw();
-            lastDist = dist;
-            updateMinimapViewport();
-        }
+
+    containerEl.addEventListener('touchmove', (e) => {
+      if (e.touches.length < 2) return;
+      e.preventDefault();
+      resetInactivityTimer();
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+
+      const dist = getDist(t1, t2);
+      if (lastDist === 0) lastDist = dist;
+      const scale = stage.scaleX() * (dist / lastDist);
+      const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+      const pointTo = { x: (center.x - stage.x()) / stage.scaleX(), y: (center.y - stage.y()) / stage.scaleX() };
+      stage.scale({ x: scale, y: scale });
+      stage.position({ x: center.x - pointTo.x * scale, y: center.y - pointTo.y * scale });
+      stage.batchDraw();
+      lastDist = dist;
+      updateMinimapViewport();
+    }, { passive: false });
+
+    containerEl.addEventListener('touchend', () => {
+      lastDist = 0;
     });
-    stage.on('touchend', () => { lastDist = 0; });
+
+    if (minimapElement) {
+      minimapElement.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        resetInactivityTimer();
+        zoomStage(e.deltaY < 0, stage.getPointerPosition());
+      }, { passive: false });
+    }
 
     try {
       const response = await fetch('/api/tiles');
@@ -332,11 +364,17 @@
     }, layer);
     sparkleAnimation.start();
     intervalId = setInterval(updateDDayTiles, 60000);
+
+    setTimeout(() => {
+      showHelpText = false;
+    }, 5000);
+    resetInactivityTimer();
   });
 
   onDestroy(() => {
     sparkleAnimation?.stop();
     clearInterval(intervalId);
+    clearTimeout(inactivityTimer);
   });
 </script>
 
@@ -350,8 +388,8 @@
       </div>
       <h2 class="text-gray-900 text-lg font-bold leading-tight tracking-[-0.015em]">D-Day Pixel Wall</h2>
     </div>
-    <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-background-dark text-sm font-bold leading-normal tracking-[0.015em]" on:click={handleAddDDayClick}>
-      <span class="truncate">나의 D-Day 등록</span>
+    <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold leading-normal tracking-[0.015em] transition hover:bg-blue-700" on:click={handleAddDDayClick}>
+      <span class="truncate">D-Day 등록</span>
     </button>
   </header>
 
@@ -367,12 +405,14 @@
     </div>
   {/if}
 
-  <div class="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-gray-900/70 text-white px-4 py-2 rounded-full text-sm animate-pulse">
-    드래그하여 탐색하고, 빈 공간을 클릭하여 D-Day를 추가하세요.
-  </div>
+  {#if showHelpText}
+    <div class="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-gray-900/70 text-white px-4 py-2 rounded-full text-sm animate-pulse">
+      드래그하여 탐색하고, 빈 공간을 클릭하여 D-Day를 추가하세요.
+    </div>
+  {/if}
 
   <div class="absolute bottom-6 right-6 z-20 flex flex-col items-end gap-4">
-    <div class="w-48 h-48 bg-white/50 border border-gray-300 rounded-lg p-1 backdrop-blur-sm">
+    <div bind:this={minimapElement} class="w-48 h-48 bg-white/50 border border-gray-300 rounded-lg p-1 backdrop-blur-sm">
       <div class="relative w-full h-full grid grid-cols-30 grid-rows-30 gap-px">
         {#each tiles as tile}
           <div class="rounded-full" style="grid-column: {Math.floor(tile.coord_x / 2) + 1} / span 1; grid-row: {Math.floor(tile.coord_y / 2) + 1} / span 1; background-color: {tile.color};"></div>
@@ -400,6 +440,8 @@
     on:close={closeModal} 
     on:submit={handleModalSubmit} 
   />
+
+  <LoadingOverlay visible={isSubmitting} />
 </main>
 
 <style>
