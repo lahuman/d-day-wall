@@ -5,7 +5,16 @@ import type { RequestHandler } from './$types';
 // GET /api/tiles
 export const GET: RequestHandler = async () => {
   try {
-    const tiles = await prisma.dDayTile.findMany();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const tiles = await prisma.dDayTile.findMany({
+      where: {
+        target_date: {
+          gte: sevenDaysAgo,
+        },
+      },
+    });
     return json(tiles);
   } catch (error) {
     console.error('Failed to fetch tiles:', error);
@@ -16,10 +25,10 @@ export const GET: RequestHandler = async () => {
 // POST /api/tiles
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { title, target_date, coord_x, coord_y } = await request.json();
+    const { title, target_date, coord_x, coord_y, color } = await request.json();
 
     // --- Validation ---
-    if (!title || !target_date || coord_x === undefined || coord_y === undefined) {
+    if (!title || !target_date || coord_x === undefined || coord_y === undefined || !color) {
       return json({ message: 'Missing required fields' }, { status: 400 });
     }
 
@@ -43,6 +52,7 @@ export const POST: RequestHandler = async ({ request }) => {
         target_date: targetDate,
         coord_x,
         coord_y,
+        color,
       },
     });
 

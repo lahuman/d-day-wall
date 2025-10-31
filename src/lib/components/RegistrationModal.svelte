@@ -1,59 +1,83 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
 
   export let show = false;
   export let coord_x: number | null = null;
   export let coord_y: number | null = null;
   export let isSubmitting = false;
 
-  let title = '';
-  let target_date = '';
+  export let title = '';
+  export let target_date = '';
+  let selectedColor = '#ef4444';
+  let minDate: string;
+
+  onMount(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    minDate = `${yyyy}-${mm}-${dd}`;
+    target_date = minDate;
+  });
+
+  const colors = [
+    { name: 'Red', value: '#ef4444' },
+    { name: 'Blue', value: '#3b82f6' },
+    { name: 'Green', value: '#22c55e' },
+    { name: 'Yellow', value: '#eab308' },
+    { name: 'Purple', value: '#a855f7' },
+    { name: 'Pink', value: '#ec4899' },
+  ];
 
   const dispatch = createEventDispatcher();
 
   function handleSubmit() {
     if (!title || !target_date) {
-      alert('Please fill out all fields.');
+      alert('모든 필드를 채워주세요.');
       return;
     }
-    dispatch('submit', { title, target_date });
+    dispatch('submit', { title, target_date, color: selectedColor });
   }
 
   function handleClose() {
-    if (isSubmitting) return; // Don't close while submitting
+    if (isSubmitting) return;
     dispatch('close');
   }
 </script>
 
 {#if show}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <div class="fixed inset-0 bg-black bg-opacity-50 z-40" on:click={handleClose}></div>
-  <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl p-6 w-full max-w-md z-50">
-    <h2 class="text-xl font-bold mb-4">Register a new D-Day</h2>
-    <p class="text-sm text-gray-600 mb-4">Location: ({coord_x}, {coord_y})</p>
-    
-    <form on:submit|preventDefault={handleSubmit}>
-      <div class="mb-4">
-        <label for="title" class="block text-gray-700 text-sm font-bold mb-2">Title</label>
-        <input type="text" id="title" bind:value={title} maxlength="50" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-      </div>
-      <div class="mb-6">
-        <label for="date" class="block text-gray-700 text-sm font-bold mb-2">Target Date</label>
-        <input type="date" id="date" bind:value={target_date} required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-      </div>
-      
-      <div class="flex items-center justify-end">
-        <button type="button" on:click={handleClose} disabled={isSubmitting} class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline mr-2 disabled:opacity-50">
-          Cancel
-        </button>
-        <button type="submit" disabled={isSubmitting} class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus_shadow-outline disabled:opacity-50">
-          {#if isSubmitting}
-            <span>Processing...</span>
-          {:else}
-            <span>Register</span>
-          {/if}
-        </button>
-      </div>
-    </form>
+  <div class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm" on:click={handleClose}>
+    <div class="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-2xl p-8 m-4" on:click|stopPropagation>
+      <h3 class="text-2xl font-bold text-gray-900 mb-6">나의 D-Day 추가하기</h3>
+      <form class="space-y-6" on:submit|preventDefault={handleSubmit}>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-2" for="event-title">이벤트 제목</label>
+          <input class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="event-title" maxlength="30" name="event-title" placeholder="예: 제주도 여행" type="text" bind:value={title} />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-2" for="d-day-date">날짜</label>
+          <input class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="d-day-date" name="d-day-date" type="date" bind:value={target_date} min={minDate} />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-2">타일 색상</label>
+          <div class="grid grid-cols-6 gap-3">
+            {#each colors as color}
+              <button class="aspect-square rounded-full" style="background-color: {color.value}" class:ring-2={selectedColor === color.value} class:ring-offset-2={selectedColor === color.value} class:ring-offset-white={selectedColor === color.value} class:ring-gray-900={selectedColor === color.value} on:click={() => selectedColor = color.value} data-alt="{color.name} color swatch" type="button"></button>
+            {/each}
+          </div>
+        </div>
+        <div class="text-center text-xs text-gray-500 pt-4">
+          <p>D-Day는 익명으로 등록됩니다. 짧은 광고 시청 후 캔버스에 영구적으로 D-Day를 남길 수 있습니다.</p>
+        </div>
+        <div class="flex items-center gap-4 pt-4">
+          <button class="w-full flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-gray-200 text-gray-800 text-base font-bold leading-normal tracking-[0.015em] transition hover:bg-gray-300" type="button" on:click={handleClose}>
+            <span class="truncate">취소</span>
+          </button>
+          <button class="w-full flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-primary text-background-dark text-base font-bold leading-normal tracking-[0.015em] transition hover:bg-primary/90" type="submit" disabled={isSubmitting}>
+            <span class="truncate">{isSubmitting ? '처리 중...' : '광고 보고 등록하기'}</span>
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 {/if}

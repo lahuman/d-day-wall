@@ -16,6 +16,7 @@ model DDayTile {
   target_date DateTime
   coord_x     Int
   coord_y     Int
+  color       String   @default("#3b82f6")
   created_at  DateTime @default(now())
 
   @@unique([coord_x, coord_y])

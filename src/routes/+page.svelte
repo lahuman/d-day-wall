@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import Konva from 'konva';
   import RegistrationModal from '$lib/components/RegistrationModal.svelte';
+  import '../app.css';
 
   type DDayTile = {
     id: string;
@@ -9,6 +10,7 @@
     target_date: string;
     coord_x: number;
     coord_y: number;
+    color: string;
     created_at: string;
   };
 
@@ -26,12 +28,8 @@
   let stage: Konva.Stage;
   let layer: Konva.Layer;
 
-  // --- Final, Working HTML Tooltip State ---
   let tooltip = { visible: false, content: '', x: 0, y: 0, dummy: 0 };
-
   let isTooltipVisibleByTouch = false;
-
-  
 
   let showModal = false;
   let isSubmitting = false;
@@ -41,16 +39,15 @@
   let sparkleAnimation: Konva.Animation | null = null;
   let intervalId: ReturnType<typeof setInterval>;
 
-  function calculateDday(targetDateStr: string): string {
+  let minimapViewport: { width: number; height: number; top: number; left: number } = { width: 0, height: 0, top: 0, left: 0 };
+
+  function calculateDday(targetDateStr: string): number {
     const targetDate = new Date(targetDateStr);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     targetDate.setHours(0, 0, 0, 0);
     const diffTime = targetDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'D-Day';
-    if (diffDays > 0) return `D-${diffDays}`;
-    return `D+${Math.abs(diffDays)}`;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
 
   function zoomStage(isZoomIn: boolean, pointerPos?: { x: number; y: number }) {
@@ -63,6 +60,7 @@
     const newPos = { x: center.x - mousePointTo.x * newScale, y: center.y - mousePointTo.y * newScale };
     stage.position(newPos);
     stage.batchDraw();
+    updateMinimapViewport();
   }
 
   const zoomIn = () => zoomStage(true);
@@ -76,20 +74,30 @@
   function updateDDayTiles() {
     dDayNodes = [];
     tiles.forEach(tile => {
-      if (isToday(new Date(tile.target_date))) {
-        const node = tileNodes.get(tile.id);
-        if (node) dDayNodes.push(node);
+      const node = tileNodes.get(tile.id);
+      if (node) {
+        const diffDays = calculateDday(tile.target_date);
+        if (diffDays === 0) {
+          dDayNodes.push(node);
+          node.setAttr('isDDay', true);
+        } else {
+          node.setAttr('isDDay', false);
+        }
       }
     });
   }
 
   function drawTile(tile: DDayTile) {
-    console.log(`Attaching listeners for tile: ${tile.title}`);
     const group = new Konva.Group({ 
       x: tile.coord_x * TILE_CELL_SIZE + TILE_MARGIN / 2,
       y: tile.coord_y * TILE_CELL_SIZE + TILE_MARGIN / 2,
     });
-    const tileRect = new Konva.Rect({ width: TILE_BODY_SIZE, height: TILE_BODY_SIZE, fill: 'lightblue', stroke: '#ddd', strokeWidth: 1, cornerRadius: 4 });
+
+    const diffDays = calculateDday(tile.target_date);
+    const tileColor = diffDays < 0 ? '#E5E7EB' : tile.color;
+    const isDDay = diffDays === 0;
+
+    const tileRect = new Konva.Rect({ width: TILE_BODY_SIZE, height: TILE_BODY_SIZE, fill: tileColor, stroke: isDDay ? '#fde047' : '#ddd', strokeWidth: isDDay ? 2 : 1, cornerRadius: 4 });
     tileNodes.set(tile.id, tileRect);
 
     const titleFontSize = 14;
@@ -101,7 +109,7 @@
       text: tile.title,
       fontSize: titleFontSize, 
       fontStyle: 'bold', 
-      fill: '#000', 
+      fill: isDDay || diffDays < 0 ? '#000' : '#fff', 
       width: TILE_BODY_SIZE - 10,
       x: 5,
       y: 10,
@@ -111,14 +119,13 @@
       ellipsis: true,
     });
 
-    const dDayText = new Konva.Text({ text: calculateDday(tile.target_date), fontSize: 20, fontStyle: 'bold', fill: '#333', width: TILE_BODY_SIZE, y: 65, align: 'center' });
+    const dDayString = isDDay ? 'D-Day!' : diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
+    const dDayText = new Konva.Text({ text: dDayString, fontSize: 20, fontStyle: 'bold', fill: isDDay || diffDays < 0 ? '#000' : '#fff', width: TILE_BODY_SIZE, y: 65, align: 'center' });
 
     group.add(tileRect, titleText, dDayText);
     layer.add(group);
 
-    // --- Final Working Tooltip Logic ---
     group.on('mouseover click tap', (e) => {
-      console.log(`Tooltip shown for tile: ${tile.title}`, e.type);
       e.cancelBubble = true;
       if (e.type === 'tap') {
         isTooltipVisibleByTouch = true;
@@ -137,16 +144,31 @@
     });
 
     group.on('mouseout', (e) => {
-      console.log(`Tooltip hidden for tile: ${tile.title}`, e.type);
       if (e.type === 'mouseout' && !isTooltipVisibleByTouch) {
         tooltip = { ...tooltip, visible: false, dummy: Math.random() };
       }
     });
   }
 
-  function handleWallClick(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
-    console.log('Wall clicked', e.target.getClassName());
+  let isRandomPlacement = false;
 
+  function findRandomEmptyCell() {
+    const occupiedCoords = new Set(tiles.map(t => `${t.coord_x},${t.coord_y}`));
+    let x, y;
+    do {
+      x = Math.floor(Math.random() * GRID_COUNT);
+      y = Math.floor(Math.random() * GRID_COUNT);
+    } while (occupiedCoords.has(`${x},${y}`));
+    return { x, y };
+  }
+
+  function handleAddDDayClick() {
+    isRandomPlacement = true;
+    selectedCoords = findRandomEmptyCell();
+    showModal = true;
+  }
+
+  function handleWallClick(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (isTooltipVisibleByTouch) {
       isTooltipVisibleByTouch = false;
       tooltip = { ...tooltip, visible: false, dummy: Math.random() };
@@ -170,16 +192,18 @@
     if (tiles.some(t => t.coord_x === coord_x && t.coord_y === coord_y)) {
       return;
     }
+    isRandomPlacement = false;
     selectedCoords = { x: coord_x, y: coord_y };
     showModal = true;
   }
 
+  let title = '';
+  let target_date = '';
 
-
-  async function handleModalSubmit(event: CustomEvent<{ title: string; target_date: string }>) {
+  async function handleModalSubmit(event: CustomEvent<{ title: string; target_date: string; color: string }>) {
     if (!selectedCoords) return;
     isSubmitting = true;
-    alert('A rewarded ad will now play. Please wait a few seconds.');
+    alert('짧은 광고 시청 후 등록됩니다.');
     await new Promise(resolve => setTimeout(resolve, 3000));
     try {
       const response = await fetch('/api/tiles', {
@@ -187,22 +211,28 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...event.detail, coord_x: selectedCoords.x, coord_y: selectedCoords.y }),
       });
-      if (response.status === 409) throw new Error('Whoops! Someone else just took that spot.');
+      if (response.status === 409) throw new Error('앗! 다른 사람이 먼저 자리를 차지했어요.');
       if (!response.ok) {
         const { message } = await response.json();
-        throw new Error(message || 'Failed to register D-Day.');
+        throw new Error(message || 'D-Day 등록에 실패했습니다.');
       }
       const newTile: DDayTile = await response.json();
-      tiles.push(newTile);
+      tiles = [...tiles, newTile];
       drawTile(newTile);
       updateDDayTiles();
       layer.batchDraw();
-      alert('Successfully registered your D-Day!');
-      closeModal();
+      alert('D-Day가 성공적으로 등록되었습니다!');
     } catch (error: any) {
       alert(error.message);
     } finally {
       isSubmitting = false;
+      title = '';
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      target_date = `${yyyy}-${mm}-${dd}`;
+      closeModal();
     }
   }
 
@@ -211,31 +241,50 @@
     selectedCoords = null;
   }
 
+  function updateMinimapViewport() {
+    if (!stage) return;
+    const scale = stage.scaleX();
+    const stagePos = stage.position();
+    const minimapWidth = 192; // w-48
+    const minimapHeight = 192; // h-48
+
+    minimapViewport = {
+      width: (window.innerWidth / WALL_WIDTH / scale) * minimapWidth,
+      height: (window.innerHeight / WALL_HEIGHT / scale) * minimapHeight,
+      left: (-stagePos.x / WALL_WIDTH / scale) * minimapWidth,
+      top: (-stagePos.y / WALL_HEIGHT / scale) * minimapHeight,
+    };
+  }
+
   onMount(async () => {
     if (!container) return;
     stage = new Konva.Stage({ container, width: window.innerWidth, height: window.innerHeight, draggable: true });
     layer = new Konva.Layer();
     stage.add(layer);
 
-    const wallBackground = new Konva.Rect({ x: 0, y: 0, width: WALL_WIDTH, height: WALL_HEIGHT, fill: '#f0f0f0' });
+    const wallBackground = new Konva.Rect({ x: 0, y: 0, width: WALL_WIDTH, height: WALL_HEIGHT, fill: 'white' });
     layer.add(wallBackground);
     wallBackground.on('click tap', handleWallClick);
 
-    stage.on('wheel', (e) => {
+    stage.on('wheel dragmove', (e) => {
       e.evt.preventDefault();
-      zoomStage(e.evt.deltaY < 0, e.target.getStage()?.getPointerPosition());
+      if (e.type === 'wheel') {
+        zoomStage(e.evt.deltaY < 0, e.target.getStage()?.getPointerPosition());
+      } else {
+        updateMinimapViewport();
+      }
     });
 
     let lastDist = 0;
-    function getDist(p1: {x: number, y: number}, p2: {x: number, y: number}) {
-        return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+    function getDist(p1: {clientX: number, clientY: number}, p2: {clientX: number, clientY: number}) {
+        return Math.sqrt(Math.pow(p2.clientX - p1.clientX, 2) + Math.pow(p2.clientY - p1.clientY, 2));
     }
     stage.on('touchmove', (e) => {
         e.evt.preventDefault();
         const t1 = e.evt.touches[0];
         const t2 = e.evt.touches[1];
         if (t1 && t2) {
-            const dist = getDist({x: t1.clientX, y: t1.clientY}, {x: t2.clientX, y: t2.clientY});
+            const dist = getDist(t1, t2);
             if (lastDist === 0) lastDist = dist;
             const scale = stage.scaleX() * (dist / lastDist);
             const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
@@ -244,13 +293,14 @@
             stage.position({ x: center.x - pointTo.x * scale, y: center.y - pointTo.y * scale });
             stage.batchDraw();
             lastDist = dist;
+            updateMinimapViewport();
         }
     });
     stage.on('touchend', () => { lastDist = 0; });
 
     try {
       const response = await fetch('/api/tiles');
-      if (!response.ok) throw new Error('Failed to fetch tiles');
+      if (!response.ok) throw new Error('타일을 불러오는데 실패했습니다.');
       tiles = await response.json();
       tiles.forEach(drawTile);
       layer.draw();
@@ -266,15 +316,18 @@
     stage.batchDraw();
 
     updateDDayTiles();
+    updateMinimapViewport();
+
     sparkleAnimation = new Konva.Animation(frame => {
       if (!frame) return;
-      const brightness = 0.15 * Math.sin(frame.time * 2 * Math.PI / 2000) + 0.85;
-      const r = Math.round(173 * brightness);
-      const g = Math.round(216 * brightness);
-      const b = Math.round(230 * brightness);
-      const newColor = `rgb(${r}, ${g}, ${b})`;
       dDayNodes.forEach(node => {
-        node.fill(newColor);
+        if (node.getAttr('isDDay')) {
+          const scale = 1 + 0.02 * Math.sin(frame.time * 2 * Math.PI / 1000);
+          node.scale({ x: scale, y: scale });
+          node.shadowColor('#fde047');
+          node.shadowBlur(10 + 10 * Math.sin(frame.time * 2 * Math.PI / 1500));
+          node.shadowOpacity(0.6 + 0.4 * Math.sin(frame.time * 2 * Math.PI / 1500));
+        }
       });
     }, layer);
     sparkleAnimation.start();
@@ -287,10 +340,24 @@
   });
 </script>
 
-<main>
-  <div bind:this={container} class="konva-container" ></div>
+<main class="relative flex h-screen w-full flex-col overflow-hidden font-display text-gray-800 antialiased">
+  <header class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 px-6 py-3 bg-white/80 backdrop-blur-sm md:px-10">
+    <div class="flex items-center gap-4 text-gray-900">
+      <div class="size-6 text-primary">
+        <svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill-rule="evenodd"></path>
+        </svg>
+      </div>
+      <h2 class="text-gray-900 text-lg font-bold leading-tight tracking-[-0.015em]">D-Day Pixel Wall</h2>
+    </div>
+    <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-background-dark text-sm font-bold leading-normal tracking-[0.015em]" on:click={handleAddDDayClick}>
+      <span class="truncate">나의 D-Day 등록</span>
+    </button>
+  </header>
 
-  <!-- HTML Tooltip -->
+  <div bind:this={container} class="konva-container flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing" >
+  </div>
+
   {#if tooltip.visible}
     <div 
       class="absolute bg-black text-white text-sm rounded py-1 px-2 shadow-lg pointer-events-none z-50"
@@ -300,16 +367,34 @@
     </div>
   {/if}
 
+  <div class="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-gray-900/70 text-white px-4 py-2 rounded-full text-sm animate-pulse">
+    드래그하여 탐색하고, 빈 공간을 클릭하여 D-Day를 추가하세요.
+  </div>
 
-  
-  <div class="fixed top-4 right-4 flex flex-col space-y-2 z-10">
-    <button on:click={zoomIn} class="w-10 h-10 bg-gray-700 text-white text-xl font-bold rounded-full shadow-lg hover:bg-gray-600">+</button>
-    <button on:click={zoomOut} class="w-10 h-10 bg-gray-700 text-white text-xl font-bold rounded-full shadow-lg hover:bg-gray-600">-</button>
+  <div class="absolute bottom-6 right-6 z-20 flex flex-col items-end gap-4">
+    <div class="w-48 h-48 bg-white/50 border border-gray-300 rounded-lg p-1 backdrop-blur-sm">
+      <div class="relative w-full h-full grid grid-cols-30 grid-rows-30 gap-px">
+        {#each tiles as tile}
+          <div class="rounded-full" style="grid-column: {Math.floor(tile.coord_x / 2) + 1} / span 1; grid-row: {Math.floor(tile.coord_y / 2) + 1} / span 1; background-color: {tile.color};"></div>
+        {/each}
+        <div class="absolute border-2 border-primary bg-primary/20" style="width: {minimapViewport.width}px; height: {minimapViewport.height}px; top: {minimapViewport.top}px; left: {minimapViewport.left}px;"></div>
+      </div>
+    </div>
+    <div class="flex flex-col gap-0.5">
+      <button on:click={zoomIn} class="flex size-10 items-center justify-center rounded-t-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70">
+        <span class="material-symbols-outlined">add</span>
+      </button>
+      <button on:click={zoomOut} class="flex size-10 items-center justify-center rounded-b-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70">
+        <span class="material-symbols-outlined">remove</span>
+      </button>
+    </div>
   </div>
 
   <RegistrationModal 
     bind:show={showModal} 
     bind:isSubmitting 
+    bind:title
+    bind:target_date
     coord_x={selectedCoords?.x} 
     coord_y={selectedCoords?.y} 
     on:close={closeModal} 
@@ -318,12 +403,11 @@
 </main>
 
 <style>
-  main, .konva-container {
+  .konva-container {
     width: 100vw;
     height: 100vh;
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background-color: #ccc;
   }
 </style>
