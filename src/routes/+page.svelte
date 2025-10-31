@@ -377,12 +377,8 @@
       infoModalTitle = '성공';
       infoModalMessage = 'D-Day가 성공적으로 등록되었습니다!';
       showInfoModal = true;
-    } catch (error: any) {
-      infoModalTitle = '오류';
-      infoModalMessage = error.message;
-      showInfoModal = true;
-    } finally {
-      isSubmitting = false;
+
+      // Reset form and close modal only on success
       title = '';
       const today = new Date();
       const yyyy = today.getFullYear();
@@ -390,6 +386,13 @@
       const dd = String(today.getDate()).padStart(2, '0');
       target_date = `${yyyy}-${mm}-${dd}`;
       closeModal();
+
+    } catch (error: any) {
+      infoModalTitle = '오류';
+      infoModalMessage = error.message;
+      showInfoModal = true;
+    } finally {
+      isSubmitting = false;
     }
   }
 
