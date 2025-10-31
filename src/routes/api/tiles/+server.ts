@@ -32,6 +32,22 @@ export const POST: RequestHandler = async ({ request }) => {
       return json({ message: 'Missing required fields' }, { status: 400 });
     }
 
+    // Title length validation
+    if (title.length > 50) {
+      return json({ message: 'Title cannot exceed 50 characters' }, { status: 400 });
+    }
+
+    // Coordinate range validation
+    if (coord_x < 0 || coord_x >= 60 || coord_y < 0 || coord_y >= 60) {
+      return json({ message: 'Coordinates must be between 0 and 59' }, { status: 400 });
+    }
+
+    // Color format validation (basic hex color check)
+    const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+    if (!hexColorRegex.test(color)) {
+      return json({ message: 'Invalid color format. Must be a hex color like #RRGGBB or #RGB.' }, { status: 400 });
+    }
+
     const targetDate = new Date(target_date);
     const now = new Date();
     const oneYearFromNow = new Date();
