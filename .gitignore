@@ -1,4 +1,6 @@
 node_modules
+#db
+prisma/dev.db
 
 # Output
 .output
