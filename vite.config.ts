@@ -6,6 +6,6 @@ export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
 		// 원하는 포트 번호 지정
-		port: 5000
+		port: 3000
 	}
 });

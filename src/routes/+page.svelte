@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import Konva from 'konva';
   import RegistrationModal from '$lib/components/RegistrationModal.svelte';
   import LoadingOverlay from '$lib/components/LoadingOverlay.svelte';
@@ -51,6 +51,41 @@
 
   let showHelpText = true;
   let inactivityTimer: ReturnType<typeof setTimeout>;
+  let headerElement: HTMLElement;
+
+  let minScale = 0.1;
+  const MAX_SCALE = 2;
+function clampPos(pos: { x: number; y: number }, overrideScale?: number) {
+    if (!stage) return pos;
+    
+    // overrideScale이 있으면 그 값을 사용하고, 없으면 현재 stage의 스케일을 사용합니다.
+    const scale = overrideScale ?? stage.scaleX(); 
+    
+    const width = stage.width();
+    const height = stage.height();
+    const wallW = WALL_WIDTH * scale;
+    const wallH = WALL_HEIGHT * scale;
+    const headerHeight = headerElement ? headerElement.offsetHeight : 60;
+    const availableHeight = height - headerHeight;
+
+    let x, y;
+
+    // X clamping
+    if (wallW < width) {
+      x = Math.max(0, Math.min(pos.x, width - wallW));
+    } else {
+      x = Math.max(width - wallW, Math.min(pos.x, 0));
+    }
+
+    // Y clamping
+    if (wallH < availableHeight) {
+      y = Math.max(headerHeight, Math.min(pos.y, height - wallH));
+    } else {
+      y = Math.max(height - wallH, Math.min(pos.y, headerHeight));
+    }
+    
+    return { x, y };
+  }
 
   function calculateDday(targetDateStr: string): number {
     const targetDate = new Date(targetDateStr);
@@ -66,16 +101,77 @@
     const oldScale = stage.scaleX();
     const center = pointerPos || { x: stage.width() / 2, y: stage.height() / 2 };
     const mousePointTo = { x: (center.x - stage.x()) / oldScale, y: (center.y - stage.y()) / oldScale };
-    const newScale = isZoomIn ? oldScale * SCALE_BY : oldScale / SCALE_BY;
+    
+    const newScaleAttempt = isZoomIn ? oldScale * SCALE_BY : oldScale / SCALE_BY;
+    const newScale = Math.max(minScale, Math.min(newScaleAttempt, MAX_SCALE));
+
+    if (newScale === oldScale) return;
+
     stage.scale({ x: newScale, y: newScale });
+
     const newPos = { x: center.x - mousePointTo.x * newScale, y: center.y - mousePointTo.y * newScale };
-    stage.position(newPos);
+    stage.position(clampPos(newPos));
     stage.batchDraw();
     updateMinimapViewport();
   }
 
   const zoomIn = () => zoomStage(true);
   const zoomOut = () => zoomStage(false);
+
+  const SHARED_ZOOM_SCALE = 0.5;
+function focusOnTile(tile: DDayTile) {
+    if (!stage || !tile) return;
+
+    const targetScale = Math.max(minScale, Math.min(SHARED_ZOOM_SCALE, MAX_SCALE));
+
+    const tileX = tile.coord_x * TILE_CELL_SIZE + TILE_CELL_SIZE / 2;
+    const tileY = tile.coord_y * TILE_CELL_SIZE + TILE_CELL_SIZE / 2;
+
+    const targetPos = {
+      x: -tileX * targetScale + stage.width() / 2,
+      y: -tileY * targetScale + stage.height() / 2,
+    };
+
+    // clampPos에 targetScale을 전달하여 올바른 위치를 계산합니다.
+    const clampedPos = clampPos(targetPos, targetScale);
+
+    stage.to({
+      x: clampedPos.x,
+      y: clampedPos.y,
+      scaleX: targetScale,
+      scaleY: targetScale,
+      duration: 0.8,
+      easing: Konva.Easings.EaseInOut,
+      onFinish: () => {
+        updateMinimapViewport();
+      }
+    });
+  }
+function jumpToTile(tile: DDayTile) {
+    if (!stage || !tile) return;
+    const targetScale = Math.max(minScale, Math.min(SHARED_ZOOM_SCALE, MAX_SCALE));
+
+    // 1. 스케일을 먼저 설정합니다.
+    stage.scale({ x: targetScale, y: targetScale });
+
+    const tileX = tile.coord_x * TILE_CELL_SIZE + TILE_CELL_SIZE / 2;
+    const tileY = tile.coord_y * TILE_CELL_SIZE + TILE_CELL_SIZE / 2;
+
+    const targetPos = {
+      x: -tileX * targetScale + stage.width() / 2,
+      y: -tileY * targetScale + stage.height() / 2,
+    };
+
+    console.log(JSON.stringify(targetPos, null, 2));
+
+    // 2. 이제 clampPos는 stage.scaleX()에서 올바른(새로운) 스케일 값을 읽어옵니다.
+    const clampedPos = clampPos(targetPos);
+
+    // 3. 계산된 위치로 이동합니다.
+    stage.position(clampedPos);
+    stage.batchDraw();
+    updateMinimapViewport();
+  }
 
   function isToday(someDate: Date) {
     const today = new Date();
@@ -205,7 +301,46 @@
       handleLike(tile, likeCount, heartIcon, likeButtonRect);
     });
 
-    group.add(tileRect, titleText, dDayText, likeButtonGroup);
+    const shareButtonGroup = new Konva.Group({
+        x: 12,
+        y: TILE_BODY_SIZE - 24 - 12,
+    });
+
+    const shareButtonRect = new Konva.Rect({
+        width: 48,
+        height: 24,
+        fill: '#f1f3f5',
+        cornerRadius: 20,
+    });
+
+    const shareText = new Konva.Text({
+        text: '공유',
+        fontSize: 13,
+        fontFamily: 'Noto Sans KR, sans-serif',
+        fontStyle: '700',
+        fill: '#555',
+        width: 48,
+        height: 24,
+        align: 'center',
+        verticalAlign: 'middle',
+    });
+
+    shareButtonGroup.add(shareButtonRect, shareText);
+    shareButtonGroup.on('click tap', (e) => {
+        e.cancelBubble = true;
+        const shareUrl = `${window.location.origin}${window.location.pathname}?tile=${tile.id}`;
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            infoModalTitle = '공유';
+            infoModalMessage = '타일 주소가 클립보드에 복사되었습니다!';
+            showInfoModal = true;
+        }, () => {
+            infoModalTitle = '오류';
+            infoModalMessage = '주소 복사에 실패했습니다.';
+            showInfoModal = true;
+        });
+    });
+
+    group.add(tileRect, titleText, dDayText, likeButtonGroup, shareButtonGroup);
     layer.add(group);
 
     group.on('mouseover', (e) => {
@@ -454,8 +589,11 @@
     const stageDx = -(dx / minimapWidth) * WALL_WIDTH * scale;
     const stageDy = -(dy / minimapHeight) * WALL_HEIGHT * scale;
 
-    stage.x(stage.x() + stageDx);
-    stage.y(stage.y() + stageDy);
+    const newPos = {
+        x: stage.x() + stageDx,
+        y: stage.y() + stageDy
+    };
+    stage.position(clampPos(newPos));
     
     stage.batchDraw();
     updateMinimapViewport();
@@ -469,7 +607,12 @@
 
   onMount(async () => {
     if (!container) return;
-    stage = new Konva.Stage({ container, width: window.innerWidth, height: window.innerHeight, draggable: true });
+    stage = new Konva.Stage({
+      container,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      draggable: true,
+    });
     layer = new Konva.Layer();
     stage.add(layer);
 
@@ -478,6 +621,7 @@
     wallBackground.on('click tap', handleWallClick);
 
     stage.on('dragmove', () => {
+      stage.position(clampPos(stage.position()));
       resetInactivityTimer();
       updateMinimapViewport();
     });
@@ -500,14 +644,29 @@
       resetInactivityTimer();
       const t1 = e.touches[0];
       const t2 = e.touches[1];
+      const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
 
       const dist = getDist(t1, t2);
-      if (lastDist === 0) lastDist = dist;
-      const scale = stage.scaleX() * (dist / lastDist);
-      const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
-      const pointTo = { x: (center.x - stage.x()) / stage.scaleX(), y: (center.y - stage.y()) / stage.scaleX() };
-      stage.scale({ x: scale, y: scale });
-      stage.position({ x: center.x - pointTo.x * scale, y: center.y - pointTo.y * scale });
+      if (lastDist === 0) {
+        lastDist = dist;
+        return;
+      }
+      
+      const oldScale = stage.scaleX();
+      const pointTo = { x: (center.x - stage.x()) / oldScale, y: (center.y - stage.y()) / oldScale };
+      
+      const newScaleAttempt = oldScale * (dist / lastDist);
+      const newScale = Math.max(minScale, Math.min(newScaleAttempt, MAX_SCALE));
+
+      if (newScale === oldScale) {
+        lastDist = dist;
+        return;
+      }
+
+      stage.scale({ x: newScale, y: newScale });
+      
+      const newPos = { x: center.x - pointTo.x * newScale, y: center.y - pointTo.y * newScale };
+      stage.position(clampPos(newPos));
       stage.batchDraw();
       lastDist = dist;
       updateMinimapViewport();
@@ -535,14 +694,43 @@
       console.error('Error loading tiles:', error);
     }
 
-    const scale = Math.min(window.innerWidth / WALL_WIDTH, window.innerHeight / WALL_HEIGHT) * 0.9;
-    stage.scale({ x: scale, y: scale });
-    const centerX = (window.innerWidth - WALL_WIDTH * scale) / 2;
-    const centerY = (window.innerHeight - WALL_HEIGHT * scale) / 2;
+    const headerHeight = headerElement ? headerElement.offsetHeight : 60;
+    const availableHeight = window.innerHeight - headerHeight;
+    const initialScale = Math.min(window.innerWidth / WALL_WIDTH, availableHeight / WALL_HEIGHT);
+    
+    minScale = initialScale;
+    stage.scale({ x: initialScale, y: initialScale });
+    
+    const centerX = (window.innerWidth - WALL_WIDTH * initialScale) / 2;
+    const centerY = headerHeight + (availableHeight - WALL_HEIGHT * initialScale) / 2;
     stage.position({ x: centerX, y: centerY });
     stage.batchDraw();
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const tileIdToFocus = urlParams.get('tile');
+
+    if (tileIdToFocus) {
+      // If a tile ID is in the URL, try to fetch it directly.
+      try {
+        const res = await fetch(`/api/tiles/${tileIdToFocus}`);
+        if (res.ok) {
+          const sharedTile: DDayTile = await res.json();
+          // Avoid adding duplicates if it was already loaded
+          if (!tiles.some(t => t.id === sharedTile.id)) {
+            tiles = [...tiles, sharedTile];
+            drawTile(sharedTile);
+          }
+          
+          await tick();
+          focusOnTile(sharedTile);
+        }
+      } catch (error) {
+        console.error('Failed to fetch shared tile:', error);
+      }
+    }
+
     updateDDayTiles();
+    updateMinimapViewport();
     updateMinimapViewport();
 
     sparkleAnimation = new Konva.Animation(frame => {
@@ -578,7 +766,7 @@
 </script>
 
 <main class="relative flex h-screen w-full flex-col overflow-hidden font-display text-gray-800 antialiased">
-  <header class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 px-6 py-3 bg-white/80 backdrop-blur-sm md:px-10">
+  <header bind:this={headerElement} class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 px-6 py-3 bg-white/80 backdrop-blur-sm md:px-10">
     <div class="flex items-center gap-4 text-gray-900">
       <div class="size-8 text-primary">
         <img src="/ci.png" alt="D-Day Pixel Wall" />
