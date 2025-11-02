@@ -727,9 +727,9 @@ function jumpToTile(tile: DDayTile) {
       if (!frame) return;
       dDayNodes.forEach(group => {
         if (group.getAttr('isDDay')) {
-          const scale = 1 + 0.05 * Math.sin(frame.time * Math.PI / 750);
+          const scale = 1 + 0.05 * Math.sin(frame.time * Math.PI / 1500);
           group.scale({ x: scale, y: scale });
-          group.opacity(0.5 + 0.5 * Math.sin(frame.time * Math.PI / 300));
+          group.opacity(0.5 + 0.5 * Math.sin(frame.time * Math.PI / 1000));
           
           const rect = group.findOne('Rect');
           if (rect) {
@@ -796,7 +796,11 @@ function jumpToTile(tile: DDayTile) {
       <div bind:this={minimapElement} class="w-48 h-48 bg-white/50 border border-gray-300 rounded-lg p-1 backdrop-blur-sm">
         <div class="relative w-full h-full grid grid-cols-30 grid-rows-30 gap-px">
           {#each tiles as tile}
-            <div class="rounded-full" style="grid-column: {Math.floor(tile.coord_x / 2) + 1} / span 1; grid-row: {Math.floor(tile.coord_y / 2) + 1} / span 1; background-color: {calculateDday(tile.target_date) < 0 ? '#f1f3f5' : tile.color};"></div>
+            {@const dday = calculateDday(tile.target_date)}
+            <div
+              class="rounded-full {dday === 0 ? 'd-day-minimap-tile' : ''}"
+              style="grid-column: {Math.floor(tile.coord_x / 2) + 1}; grid-row: {Math.floor(tile.coord_y / 2) + 1}; background-color: {dday < 0 ? '#f1f3f5' : dday === 0 ? '#e74c3c' : tile.color};"
+            ></div>
           {/each}
           <div 
             class="absolute border-2 border-primary bg-primary/20 cursor-move" 
@@ -845,5 +849,13 @@ function jumpToTile(tile: DDayTile) {
     margin: 0;
     padding: 0;
     overflow: hidden;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0.2;
+    }
+  }
+  .d-day-minimap-tile {
+    animation: blink 1.5s infinite;
   }
 </style>
