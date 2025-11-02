@@ -52,13 +52,16 @@
   let showHelpText = true;
   let inactivityTimer: ReturnType<typeof setTimeout>;
   let headerElement: HTMLElement;
+  let showControls = true; // Added for controls visibility toggle
+
+  let title = '';
+  let target_date = '';
 
   let minScale = 0.1;
   const MAX_SCALE = 2;
 function clampPos(pos: { x: number; y: number }, overrideScale?: number) {
     if (!stage) return pos;
     
-    // overrideScale이 있으면 그 값을 사용하고, 없으면 현재 stage의 스케일을 사용합니다.
     const scale = overrideScale ?? stage.scaleX(); 
     
     const width = stage.width();
@@ -70,14 +73,12 @@ function clampPos(pos: { x: number; y: number }, overrideScale?: number) {
 
     let x, y;
 
-    // X clamping
     if (wallW < width) {
       x = Math.max(0, Math.min(pos.x, width - wallW));
     } else {
       x = Math.max(width - wallW, Math.min(pos.x, 0));
     }
 
-    // Y clamping
     if (wallH < availableHeight) {
       y = Math.max(headerHeight, Math.min(pos.y, height - wallH));
     } else {
@@ -132,7 +133,6 @@ function focusOnTile(tile: DDayTile) {
       y: -tileY * targetScale + stage.height() / 2,
     };
 
-    // clampPos에 targetScale을 전달하여 올바른 위치를 계산합니다.
     const clampedPos = clampPos(targetPos, targetScale);
 
     stage.to({
@@ -151,7 +151,6 @@ function jumpToTile(tile: DDayTile) {
     if (!stage || !tile) return;
     const targetScale = Math.max(minScale, Math.min(SHARED_ZOOM_SCALE, MAX_SCALE));
 
-    // 1. 스케일을 먼저 설정합니다.
     stage.scale({ x: targetScale, y: targetScale });
 
     const tileX = tile.coord_x * TILE_CELL_SIZE + TILE_CELL_SIZE / 2;
@@ -164,10 +163,8 @@ function jumpToTile(tile: DDayTile) {
 
     console.log(JSON.stringify(targetPos, null, 2));
 
-    // 2. 이제 clampPos는 stage.scaleX()에서 올바른(새로운) 스케일 값을 읽어옵니다.
     const clampedPos = clampPos(targetPos);
 
-    // 3. 계산된 위치로 이동합니다.
     stage.position(clampedPos);
     stage.batchDraw();
     updateMinimapViewport();
@@ -193,10 +190,8 @@ function jumpToTile(tile: DDayTile) {
         }
         
         if (wasDDay && !isDDay) {
-          // No longer D-Day, reset state
           group.scale({ x: 1, y: 1 });
           group.opacity(1);
-          // Reset shadow
           const tileRect = node as Konva.Rect;
           tileRect.shadowBlur(10);
           tileRect.shadowColor('rgba(0,0,0,0.1)');
@@ -216,7 +211,7 @@ function jumpToTile(tile: DDayTile) {
     const group = new Konva.Group({
       x: tile.coord_x * TILE_CELL_SIZE + TILE_MARGIN / 2,
       y: tile.coord_y * TILE_CELL_SIZE + TILE_MARGIN / 2,
-      opacity: isPast ? 0.7 : 1
+      opacity: 1
     });
 
     group.setAttr('isDDay', isDDay);
@@ -224,7 +219,7 @@ function jumpToTile(tile: DDayTile) {
         const tileRect = new Konva.Rect({
           width: TILE_BODY_SIZE,
           height: TILE_BODY_SIZE,
-          fill: tile.color,
+          fill: isPast ? '#f1f3f5' : tile.color,
           cornerRadius: 12,
           shadowColor: 'rgba(0,0,0,0.1)',
           shadowBlur: 10,
@@ -238,8 +233,9 @@ function jumpToTile(tile: DDayTile) {
           fontSize: 14,
           fontFamily: 'Noto Sans KR, sans-serif',
           fontStyle: '700',
-          fill: '#555',
+          fill: isPast ? '#868e96' : '#555',
           width: TILE_BODY_SIZE - 24,
+          height: 14 * 1.4 * 3, // 3 lines truncation
           x: 12,
           y: 12,
           lineHeight: 1.4,
@@ -355,7 +351,6 @@ function jumpToTile(tile: DDayTile) {
         duration: 0.2
       });
 
-      // Tooltip logic
       e.cancelBubble = true;
       const containerRect = container.getBoundingClientRect();
       const pos = e.evt.changedTouches ? e.evt.changedTouches[0] : e.evt;
@@ -382,7 +377,6 @@ function jumpToTile(tile: DDayTile) {
         duration: 0.2
       });
 
-      // Tooltip logic
       if (e.type === 'mouseout' && !isTooltipVisibleByTouch) {
         tooltip = { ...tooltip, visible: false, dummy: Math.random() };
       }
@@ -423,7 +417,9 @@ function jumpToTile(tile: DDayTile) {
 
       const updatedTile: DDayTile = await response.json();
       likeCount.text(String(updatedTile.likes));
-      localStorage.setItem('likedTiles', JSON.stringify([...likedTiles, tile.id]));
+      
+      const newLikedTiles = [...likedTiles, tile.id];
+      localStorage.setItem('likedTiles', JSON.stringify(newLikedTiles));
 
       likeButtonRect.fill('#fff0f0');
       heartIcon.fill('#e74c3c');
@@ -486,9 +482,6 @@ function jumpToTile(tile: DDayTile) {
     showModal = true;
   }
 
-  let title = '';
-  let target_date = '';
-
   async function handleModalSubmit(event: CustomEvent<{ title: string; target_date: string; color: string }>) {
     if (!selectedCoords) return;
     isSubmitting = true;
@@ -513,7 +506,6 @@ function jumpToTile(tile: DDayTile) {
       infoModalMessage = 'D-Day가 성공적으로 등록되었습니다!';
       showInfoModal = true;
 
-      // Reset form and close modal only on success
       title = '';
       const today = new Date();
       const yyyy = today.getFullYear();
@@ -540,8 +532,8 @@ function jumpToTile(tile: DDayTile) {
     if (!stage) return;
     const scale = stage.scaleX();
     const stagePos = stage.position();
-    const minimapWidth = 192; // w-48
-    const minimapHeight = 192; // h-48
+    const minimapWidth = 192;
+    const minimapHeight = 192;
 
     minimapViewport = {
       width: (window.innerWidth / WALL_WIDTH / scale) * minimapWidth,
@@ -710,12 +702,10 @@ function jumpToTile(tile: DDayTile) {
     const tileIdToFocus = urlParams.get('tile');
 
     if (tileIdToFocus) {
-      // If a tile ID is in the URL, try to fetch it directly.
       try {
         const res = await fetch(`/api/tiles/${tileIdToFocus}`);
         if (res.ok) {
           const sharedTile: DDayTile = await res.json();
-          // Avoid adding duplicates if it was already loaded
           if (!tiles.some(t => t.id === sharedTile.id)) {
             tiles = [...tiles, sharedTile];
             drawTile(sharedTile);
@@ -739,7 +729,7 @@ function jumpToTile(tile: DDayTile) {
         if (group.getAttr('isDDay')) {
           const scale = 1 + 0.05 * Math.sin(frame.time * Math.PI / 750);
           group.scale({ x: scale, y: scale });
-          group.opacity(0.5 + 0.5 * Math.sin(frame.time * Math.PI / 300)); // Faster blink
+          group.opacity(0.5 + 0.5 * Math.sin(frame.time * Math.PI / 300));
           
           const rect = group.findOne('Rect');
           if (rect) {
@@ -771,11 +761,16 @@ function jumpToTile(tile: DDayTile) {
       <div class="size-8 text-primary">
         <img src="/ci.png" alt="D-Day Pixel Wall" />
       </div>
-      <h2 class="text-gray-900 text-lg font-bold leading-tight tracking-[-0.015em]">D-Day Pixel Wall</h2>
+      <h2 class="text-gray-900 text-lg font-bold leading-tight tracking-[-0.015em]">Wall</h2>
     </div>
-    <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold leading-normal tracking-[0.015em] transition hover:bg-blue-700" on:click={handleAddDDayClick}>
-      <span class="truncate">D-Day 등록</span>
-    </button>
+    <div class="flex items-center gap-2">
+      <button class="flex size-10 items-center justify-center rounded-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70" on:click={() => showControls = !showControls}>
+        <span class="material-symbols-outlined">{showControls ? 'visibility' : 'visibility_off'}</span>
+      </button>
+      <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold leading-normal tracking-[0.015em] transition hover:bg-blue-700" on:click={handleAddDDayClick}>
+        <span class="truncate">D-Day 등록</span>
+      </button>
+    </div>
   </header>
 
   <div bind:this={container} class="konva-container flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing" >
@@ -796,29 +791,31 @@ function jumpToTile(tile: DDayTile) {
     </div>
   {/if}
 
-  <div class="absolute bottom-6 right-6 z-20 flex flex-col items-end gap-4">
-    <div bind:this={minimapElement} class="w-48 h-48 bg-white/50 border border-gray-300 rounded-lg p-1 backdrop-blur-sm">
-      <div class="relative w-full h-full grid grid-cols-30 grid-rows-30 gap-px">
-        {#each tiles as tile}
-          <div class="rounded-full" style="grid-column: {Math.floor(tile.coord_x / 2) + 1} / span 1; grid-row: {Math.floor(tile.coord_y / 2) + 1} / span 1; background-color: {tile.color};"></div>
-        {/each}
-        <div 
-          class="absolute border-2 border-primary bg-primary/20 cursor-move" 
-          style="width: {minimapViewport.width}px; height: {minimapViewport.height}px; top: {minimapViewport.top}px; left: {minimapViewport.left}px;"
-          on:mousedown={onMinimapDragStart}
-          on:touchstart={onMinimapDragStart}
-        ></div>
+  {#if showControls}
+    <div class="absolute bottom-6 right-6 z-20 flex flex-col items-end gap-4">
+      <div bind:this={minimapElement} class="w-48 h-48 bg-white/50 border border-gray-300 rounded-lg p-1 backdrop-blur-sm">
+        <div class="relative w-full h-full grid grid-cols-30 grid-rows-30 gap-px">
+          {#each tiles as tile}
+            <div class="rounded-full" style="grid-column: {Math.floor(tile.coord_x / 2) + 1} / span 1; grid-row: {Math.floor(tile.coord_y / 2) + 1} / span 1; background-color: {calculateDday(tile.target_date) < 0 ? '#f1f3f5' : tile.color};"></div>
+          {/each}
+          <div 
+            class="absolute border-2 border-primary bg-primary/20 cursor-move" 
+            style="width: {minimapViewport.width}px; height: {minimapViewport.height}px; top: {minimapViewport.top}px; left: {minimapViewport.left}px;"
+            on:mousedown={onMinimapDragStart}
+            on:touchstart={onMinimapDragStart}
+          ></div>
+        </div>
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <button on:click={zoomIn} class="flex size-10 items-center justify-center rounded-t-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+        <button on:click={zoomOut} class="flex size-10 items-center justify-center rounded-b-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70">
+          <span class="material-symbols-outlined">remove</span>
+        </button>
       </div>
     </div>
-    <div class="flex flex-col gap-0.5">
-      <button on:click={zoomIn} class="flex size-10 items-center justify-center rounded-t-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70">
-        <span class="material-symbols-outlined">add</span>
-      </button>
-      <button on:click={zoomOut} class="flex size-10 items-center justify-center rounded-b-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70">
-        <span class="material-symbols-outlined">remove</span>
-      </button>
-    </div>
-  </div>
+  {/if}
 
   <RegistrationModal 
     bind:show={showModal} 
