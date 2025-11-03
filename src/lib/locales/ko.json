@@ -1,0 +1,40 @@
+{
+  "about": {
+    "title": "D-Day 픽셀 월",
+    "line1": "당신의 목표가 하나의 픽셀이 되어,\n모두의 꿈을 완성하는 거대한 D-Day 픽셀 월을 만들어갑니다.",
+    "line2": "시험 준비, 여행, 기념일처럼 반드시 이루고 싶은 순간부터  \n운동 시작, 책 읽기 같은 작은 도전까지—  \n여기서 당신의 D-Day를 기록하고 세상과 공유해보세요.",
+    "line3": "다른 사람들의 목표에 '좋아요'를 보내고,\n응원과 영감의 에너지가 모여 거대한 디지털 아트가 완성됩니다.",
+    "line4": "각자의 여정은 다르지만, 우리는 함께 앞으로 갑니다.\n당신의 하루가 이 벽을 채우는 하나의 빛이 됩니다.",
+    "close": "확인"
+  },
+  "page": {
+    "header_title": "Wall",
+    "register_button": "D-Day 등록",
+    "help_text": "드래그하여 탐색하고, 빈 공간을 클릭하여 D-Day를 추가하세요.",
+    "share_success_title": "공유",
+    "share_success_message": "타일 주소가 클립보드에 복사되었습니다!",
+    "share_error_title": "오류",
+    "share_error_message": "주소 복사에 실패했습니다.",
+    "like_already_liked_title": "알림",
+    "like_already_liked_message": "이미 좋아한 타일입니다.",
+    "like_error_title": "오류",
+    "like_error_message": "좋아요에 실패했습니다.",
+    "submit_success_title": "성공",
+    "submit_success_message": "D-Day가 성공적으로 등록되었습니다!",
+    "submit_error_title": "오류"
+  },
+  "registration_modal": {
+    "title": "나의 D-Day 추가하기",
+    "event_title_label": "이벤트 제목",
+    "event_title_placeholder": "예: 제주도 여행",
+    "date_label": "날짜",
+    "color_label": "타일 색상",
+    "help_text": "D-Day는 익명으로 등록됩니다. 짧은 광고 시청 후 캔버스에 영구적으로 D-Day를 남길 수 있습니다.",
+    "cancel_button": "취소",
+    "submit_button_processing": "처리 중...",
+    "submit_button": "등록하기",
+    "alert_all_fields": "모든 필드를 채워주세요.",
+    "error_date_past": "D-Day는 오늘 이후의 날짜여야 합니다.",
+    "error_date_future": "D-Day는 1년 이내의 날짜여야 합니다."
+  }
+}

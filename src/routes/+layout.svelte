@@ -1,12 +1,9 @@
-<script lang="ts">
-	import '../app.css';
-	import favicon from '$lib/assets/ci.png';
-
-	let { children } = $props();
+<script>
+  import "../app.css";
+  import { locale } from 'svelte-i18n';
 </script>
 
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
+{#if $locale}
+  <slot />
+{/if}
 
-{@render children?.()}

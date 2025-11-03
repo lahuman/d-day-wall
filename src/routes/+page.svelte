@@ -2,6 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import type { PageData } from './$types';
   import Konva from 'konva';
+  import { t } from 'svelte-i18n';
   import RegistrationModal from '$lib/components/RegistrationModal.svelte';
   import LoadingOverlay from '$lib/components/LoadingOverlay.svelte';
   import InfoModal from '$lib/components/InfoModal.svelte';
@@ -333,12 +334,12 @@ function jumpToTile(tile: DDayTile) {
         e.cancelBubble = true;
         const shareUrl = `${window.location.origin}${window.location.pathname}?tile=${tile.id}`;
         navigator.clipboard.writeText(shareUrl).then(() => {
-            infoModalTitle = '공유';
-            infoModalMessage = '타일 주소가 클립보드에 복사되었습니다!';
+            infoModalTitle = $t('page.share_success_title');
+            infoModalMessage = $t('page.share_success_message');
             showInfoModal = true;
         }, () => {
-            infoModalTitle = '오류';
-            infoModalMessage = '주소 복사에 실패했습니다.';
+            infoModalTitle = $t('page.share_error_title');
+            infoModalMessage = $t('page.share_error_message');
             showInfoModal = true;
         });
     });
@@ -410,8 +411,8 @@ function jumpToTile(tile: DDayTile) {
   async function handleLike(tile: DDayTile, likeCount: Konva.Text, heartIcon: Konva.Path, likeButtonRect: Konva.Rect) {
     const likedTiles = JSON.parse(localStorage.getItem('likedTiles') || '[]');
     if (likedTiles.includes(tile.id)) {
-      infoModalTitle = '알림';
-      infoModalMessage = '이미 좋아한 타일입니다.';
+      infoModalTitle = $t('page.like_already_liked_title');
+      infoModalMessage = $t('page.like_already_liked_message');
       showInfoModal = true;
       return;
     }
@@ -419,7 +420,7 @@ function jumpToTile(tile: DDayTile) {
     try {
       const response = await fetch(`/api/tiles/${tile.id}/like`, { method: 'POST' });
       if (!response.ok) {
-        throw new Error('좋아요에 실패했습니다.');
+        throw new Error($t('page.like_error_message'));
       }
 
       const updatedTile: DDayTile = await response.json();
@@ -434,7 +435,7 @@ function jumpToTile(tile: DDayTile) {
       likeCount.fill('#e74c3c');
 
     } catch (error: any) {
-      infoModalTitle = '오류';
+      infoModalTitle = $t('page.like_error_title');
       infoModalMessage = error.message;
       showInfoModal = true;
     }
@@ -506,8 +507,8 @@ function jumpToTile(tile: DDayTile) {
       }
       const newTile: DDayTile = await response.json();
       fetchAndUpdateTiles(false);
-      infoModalTitle = '성공';
-      infoModalMessage = 'D-Day가 성공적으로 등록되었습니다!';
+      infoModalTitle = $t('page.submit_success_title');
+      infoModalMessage = $t('page.submit_success_message');
       showInfoModal = true;
 
       title = '';
@@ -519,7 +520,7 @@ function jumpToTile(tile: DDayTile) {
       closeModal();
 
     } catch (error: any) {
-      infoModalTitle = '오류';
+      infoModalTitle = $t('page.submit_error_title');
       infoModalMessage = error.message;
       showInfoModal = true;
     } finally {
@@ -842,14 +843,14 @@ function jumpToTile(tile: DDayTile) {
       <div class="size-8 text-primary">
         <img src="/ci.png" alt="D-Day Pixel Wall" />
       </div>
-      <h2 class="text-gray-900 text-lg font-bold leading-tight tracking-[-0.015em]">Wall</h2>
+      <h2 class="text-gray-900 text-lg font-bold leading-tight tracking-[-0.015em]">{$t('page.header_title')}</h2>
     </div>
     <div class="flex items-center gap-2">
       <button class="flex size-10 items-center justify-center rounded-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70" on:click={() => showControls = !showControls}>
         <span class="material-symbols-outlined">{showControls ? 'visibility' : 'visibility_off'}</span>
       </button>
       <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold leading-normal tracking-[0.015em] transition hover:bg-blue-700" on:click={handleAddDDayClick}>
-        <span class="truncate">D-Day 등록</span>
+        <span class="truncate">{$t('page.register_button')}</span>
       </button>
     </div>
   </header>
@@ -868,7 +869,7 @@ function jumpToTile(tile: DDayTile) {
 
   {#if showHelpText}
     <div class="absolute top-20 left-1/2 -translate-x-1/2 z-10 bg-gray-900/70 text-white px-4 py-2 rounded-full text-sm animate-pulse">
-      드래그하여 탐색하고, 빈 공간을 클릭하여 D-Day를 추가하세요.
+      {$t('page.help_text')}
     </div>
   {/if}
 

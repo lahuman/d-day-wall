@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
+  import { t } from 'svelte-i18n';
 
   export let show = false;
   export let coord_x: number | null = null;
@@ -36,7 +37,7 @@
     dateError = null; // Clear previous errors
 
     if (!title || !target_date) {
-      alert('모든 필드를 채워주세요.');
+      alert($t('registration_modal.alert_all_fields'));
       return;
     }
 
@@ -51,12 +52,12 @@
     oneYearFromNow.setHours(0, 0, 0, 0);
 
     if (selectedDate <= today) {
-      dateError = 'D-Day는 오늘 이후의 날짜여야 합니다.';
+      dateError = $t('registration_modal.error_date_past');
       return;
     }
 
     if (selectedDate > oneYearFromNow) {
-      dateError = 'D-Day는 1년 이내의 날짜여야 합니다.';
+      dateError = $t('registration_modal.error_date_future');
       return;
     }
 
@@ -72,21 +73,21 @@
 {#if show}
   <div class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm" on:click={handleClose}>
     <div class="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-2xl p-8 m-4" on:click|stopPropagation>
-      <h3 class="text-2xl font-bold text-gray-900 mb-6">나의 D-Day 추가하기</h3>
+      <h3 class="text-2xl font-bold text-gray-900 mb-6">{$t('registration_modal.title')}</h3>
       <form class="space-y-6" on:submit|preventDefault={handleSubmit}>
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-2" for="event-title">이벤트 제목</label>
-          <input class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="event-title" maxlength="30" name="event-title" placeholder="예: 제주도 여행" type="text" bind:value={title} />
+          <label class="block text-sm font-medium text-gray-600 mb-2" for="event-title">{$t('registration_modal.event_title_label')}</label>
+          <input class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="event-title" maxlength="30" name="event-title" placeholder={$t('registration_modal.event_title_placeholder')} type="text" bind:value={title} />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-2" for="d-day-date">날짜</label>
+          <label class="block text-sm font-medium text-gray-600 mb-2" for="d-day-date">{$t('registration_modal.date_label')}</label>
           <input class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="d-day-date" name="d-day-date" type="date" bind:value={target_date} min={minDate} on:input={() => dateError = null} />
           {#if dateError}
             <p class="text-red-500 text-sm mt-1">{dateError}</p>
           {/if}
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-2">타일 색상</label>
+          <label class="block text-sm font-medium text-gray-600 mb-2">{$t('registration_modal.color_label')}</label>
           <div class="grid grid-cols-6 gap-3">
             {#each colors as color}
               <button class="aspect-square rounded-full" style="background-color: {color.value}" class:ring-2={selectedColor === color.value} class:ring-offset-2={selectedColor === color.value} class:ring-offset-white={selectedColor === color.value} class:ring-gray-900={selectedColor === color.value} on:click={() => selectedColor = color.value} data-alt="{color.name} color swatch" type="button"></button>
@@ -94,14 +95,14 @@
           </div>
         </div>
         <div class="text-center text-xs text-gray-500 pt-4">
-          <p>D-Day는 익명으로 등록됩니다. 짧은 광고 시청 후 캔버스에 영구적으로 D-Day를 남길 수 있습니다.</p>
+          <p>{$t('registration_modal.help_text')}</p>
         </div>
         <div class="flex items-center gap-4 pt-4">
           <button class="w-full flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 border border-gray-300 bg-transparent text-base font-bold leading-normal tracking-[0.015em] text-gray-800 transition hover:bg-gray-100" type="button" on:click={handleClose}>
-            <span class="truncate">취소</span>
+            <span class="truncate">{$t('registration_modal.cancel_button')}</span>
           </button>
           <button class="w-full flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-4 bg-blue-600 text-white text-base font-bold leading-normal tracking-[0.015em] transition hover:bg-blue-700" type="submit" disabled={isSubmitting}>
-            <span class="truncate">{isSubmitting ? '처리 중...' : '등록하기'}</span>
+            <span class="truncate">{isSubmitting ? $t('registration_modal.submit_button_processing') : $t('registration_modal.submit_button')}</span>
           </button>
         </div>
       </form>

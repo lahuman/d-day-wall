@@ -1,0 +1,40 @@
+{
+  "about": {
+    "title": "D-Day Pixel Wall",
+    "line1": "Your goal becomes a single pixel,\ncreating a giant D-Day Pixel Wall that fulfills everyone's dreams.",
+    "line2": "From moments you must achieve like exams, trips, and anniversaries,\nto small challenges like starting a workout or reading a book—\nrecord your D-Day here and share it with the world.",
+    "line3": "Send 'likes' to other people's goals,\nand the energy of support and inspiration comes together to complete a huge digital art.",
+    "line4": "Everyone's journey is different, but we move forward together.\nYour day becomes a light that fills this wall.",
+    "close": "Close"
+  },
+  "page": {
+    "header_title": "Wall",
+    "register_button": "Register D-Day",
+    "help_text": "Drag to explore, and click an empty space to add a D-Day.",
+    "share_success_title": "Share",
+    "share_success_message": "Tile address has been copied to the clipboard!",
+    "share_error_title": "Error",
+    "share_error_message": "Failed to copy the address.",
+    "like_already_liked_title": "Notice",
+    "like_already_liked_message": "You have already liked this tile.",
+    "like_error_title": "Error",
+    "like_error_message": "Failed to like the tile.",
+    "submit_success_title": "Success",
+    "submit_success_message": "D-Day has been successfully registered!",
+    "submit_error_title": "Error"
+  },
+  "registration_modal": {
+    "title": "Add My D-Day",
+    "event_title_label": "Event Title",
+    "event_title_placeholder": "e.g., Trip to Jeju Island",
+    "date_label": "Date",
+    "color_label": "Tile Color",
+    "help_text": "D-Days are registered anonymously. After a short ad, you can permanently leave your D-Day on the canvas.",
+    "cancel_button": "Cancel",
+    "submit_button_processing": "Processing...",
+    "submit_button": "Register",
+    "alert_all_fields": "Please fill in all fields.",
+    "error_date_past": "D-Day must be a future date.",
+    "error_date_future": "D-Day must be within one year."
+  }
+}
