@@ -126,6 +126,23 @@ function clampPos(pos: { x: number; y: number }, overrideScale?: number) {
   const zoomIn = () => zoomStage(true);
   const zoomOut = () => zoomStage(false);
 
+  function saveCanvas() {
+    if (!stage) return;
+
+    const dataURL = stage.toDataURL({
+      mimeType: 'image/png',
+      quality: 1,
+      pixelRatio: 2, // Increase pixel ratio for higher resolution
+    });
+
+    const link = document.createElement('a');
+    link.download = 'd-day-wall.png';
+    link.href = dataURL;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   const SHARED_ZOOM_SCALE = 0.5;
 function focusOnTile(tile: DDayTile) {
     if (!stage || !tile) return;
@@ -848,6 +865,9 @@ function jumpToTile(tile: DDayTile) {
     <div class="flex items-center gap-2">
       <button class="flex size-10 items-center justify-center rounded-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70" on:click={() => showControls = !showControls}>
         <span class="material-symbols-outlined">{showControls ? 'visibility' : 'visibility_off'}</span>
+      </button>
+      <button class="flex size-10 items-center justify-center rounded-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70" on:click={saveCanvas}>
+        <span class="material-symbols-outlined">download</span>
       </button>
       <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold leading-normal tracking-[0.015em] transition hover:bg-blue-700" on:click={handleAddDDayClick}>
         <span class="truncate">{$t('page.register_button')}</span>
