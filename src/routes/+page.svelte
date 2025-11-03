@@ -5,6 +5,7 @@
   import RegistrationModal from '$lib/components/RegistrationModal.svelte';
   import LoadingOverlay from '$lib/components/LoadingOverlay.svelte';
   import InfoModal from '$lib/components/InfoModal.svelte';
+  import AboutModal from '$lib/components/AboutModal.svelte';
   import '../app.css';
 
   type DDayTile = {
@@ -46,6 +47,7 @@
   let showInfoModal = false;
   let infoModalTitle = '';
   let infoModalMessage = '';
+  let showAboutModal = false;
 
   let dDayNodes: Konva.Group[] = [];
   let sparkleAnimation: Konva.Animation | null = null;
@@ -836,7 +838,7 @@ function jumpToTile(tile: DDayTile) {
 
 <main class="relative flex h-screen w-full flex-col overflow-hidden font-display text-gray-800 antialiased">
   <header bind:this={headerElement} class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 px-6 py-3 bg-white/80 backdrop-blur-sm md:px-10">
-    <div class="flex items-center gap-4 text-gray-900">
+    <div class="flex items-center gap-4 text-gray-900 cursor-pointer" on:click={() => showAboutModal = true}>
       <div class="size-8 text-primary">
         <img src="/ci.png" alt="D-Day Pixel Wall" />
       </div>
@@ -919,6 +921,8 @@ function jumpToTile(tile: DDayTile) {
     message={infoModalMessage}
     on:close={() => showInfoModal = false} 
   />
+
+  <AboutModal bind:show={showAboutModal} />
 </main>
 
 <style>
