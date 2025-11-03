@@ -3,17 +3,29 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 // GET /api/tiles
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ url }) => {
   try {
+    const since = url.searchParams.get('since');
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const tiles = await prisma.dDayTile.findMany({
-      where: {
-        target_date: {
-          gte: sevenDaysAgo,
-        },
+    const where: any = {
+      target_date: {
+        gte: sevenDaysAgo,
       },
+    };
+
+    if (since) {
+      const sinceDate = new Date(since);
+      if (!isNaN(sinceDate.getTime())) {
+        where.updated_at = {
+          gt: sinceDate,
+        };
+      }
+    }
+
+    const tiles = await prisma.dDayTile.findMany({
+      where,
     });
     return json(tiles);
   } catch (error) {

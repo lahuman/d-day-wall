@@ -294,6 +294,7 @@ function jumpToTile(tile: DDayTile) {
           fill: liked ? '#e74c3c' : '#555',
           x: 8 + 14 + 4,
           y: 5,
+          name: 'like-count-text',
         });
     likeButtonGroup.add(likeButtonRect, heartIcon, likeCount);
     likeButtonGroup.on('click tap', (e) => {
@@ -502,10 +503,7 @@ function jumpToTile(tile: DDayTile) {
         throw new Error(message || 'D-Day 등록에 실패했습니다.');
       }
       const newTile: DDayTile = await response.json();
-      tiles = [...tiles, newTile];
-      drawTile(newTile);
-      updateDDayTiles();
-      layer.batchDraw();
+      fetchAndUpdateTiles(false);
       infoModalTitle = '성공';
       infoModalMessage = 'D-Day가 성공적으로 등록되었습니다!';
       showInfoModal = true;
@@ -601,6 +599,83 @@ function jumpToTile(tile: DDayTile) {
     window.removeEventListener('touchmove', onMinimapDragMove);
   }
 
+  let tileUpdateInterval: ReturnType<typeof setInterval>;
+  let lastPollTime: string | null = null;
+  let pollCount = 0;
+
+  function updateTileNode(tile: DDayTile) {
+    const node = tileNodes.get(tile.id);
+    if (!node) return;
+
+    const group = node.getParent();
+    const likeCount = group.findOne('.like-count-text') as Konva.Text;
+    if (likeCount && likeCount.text() !== String(tile.likes)) {
+      likeCount.text(String(tile.likes));
+    }
+  }
+
+  async function fetchAndUpdateTiles(isFullSync = false) {
+    const startTime = new Date();
+    let url = '/api/tiles';
+    if (!isFullSync && lastPollTime) {
+      url += `?since=${lastPollTime}`;
+    }
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error('Failed to fetch tiles for update');
+        return;
+      }
+      const fetchedTiles: DDayTile[] = await response.json();
+      lastPollTime = startTime.toISOString();
+
+      if (isFullSync) {
+        const newTilesMap = new Map(fetchedTiles.map(t => [t.id, t]));
+        const currentTilesMap = new Map(tiles.map(t => [t.id, t]));
+
+        for (const newTile of fetchedTiles) {
+          if (!currentTilesMap.has(newTile.id)) {
+            drawTile(newTile);
+          }
+        }
+
+        for (const currentTile of tiles) {
+          if (!newTilesMap.has(currentTile.id)) {
+            const node = tileNodes.get(currentTile.id);
+            if (node) {
+              node.getParent().destroy();
+              tileNodes.delete(currentTile.id);
+            }
+          }
+        }
+        tiles = fetchedTiles;
+      } else {
+        const currentTilesMap = new Map(tiles.map(t => [t.id, t]));
+        fetchedTiles.forEach(newTile => {
+          if (currentTilesMap.has(newTile.id)) {
+            // Update existing tile
+            const index = tiles.findIndex(t => t.id === newTile.id);
+            if (index !== -1) {
+              tiles[index] = newTile;
+              updateTileNode(newTile);
+            }
+          } else {
+            // Add new tile
+            tiles = [...tiles, newTile];
+            drawTile(newTile);
+          }
+        });
+      }
+
+      updateDDayTiles();
+      layer.batchDraw();
+
+    } catch (error) {
+      console.error('Error updating tiles:', error);
+    }
+  }
+
   onMount(async () => {
     if (!container) return;
     stage = new Konva.Stage({
@@ -680,18 +755,7 @@ function jumpToTile(tile: DDayTile) {
       }, { passive: false });
     }
 
-    try {
-      const response = await fetch('/api/tiles');
-      if (!response.ok) throw new Error('타일을 불러오는데 실패했습니다.');
-      tiles = await response.json();
-      if (sharedTile && !tiles.some(t => t.id === sharedTile.id)) {
-        tiles.push(sharedTile);
-      }
-      tiles.forEach(drawTile);
-      layer.draw();
-    } catch (error) {
-      console.error('Error loading tiles:', error);
-    }
+    await fetchAndUpdateTiles(true);
 
     const headerHeight = headerElement ? headerElement.offsetHeight : 60;
     const availableHeight = window.innerHeight - headerHeight;
@@ -706,12 +770,16 @@ function jumpToTile(tile: DDayTile) {
     stage.batchDraw();
 
     if (sharedTile) {
+      if (!tiles.some(t => t.id === sharedTile.id)) {
+        tiles = [...tiles, sharedTile];
+        drawTile(sharedTile);
+        layer.batchDraw();
+      }
       await tick();
       focusOnTile(sharedTile);
     }
 
     updateDDayTiles();
-    updateMinimapViewport();
     updateMinimapViewport();
 
     sparkleAnimation = new Konva.Animation(frame => {
@@ -737,12 +805,19 @@ function jumpToTile(tile: DDayTile) {
       showHelpText = false;
     }, 5000);
     resetInactivityTimer();
+
+    tileUpdateInterval = setInterval(() => {
+      pollCount++;
+      const isFullSync = pollCount % 6 === 0; // Full sync every 60 seconds
+      fetchAndUpdateTiles(isFullSync);
+    }, 10000);
   });
 
   onDestroy(() => {
     sparkleAnimation?.stop();
     clearInterval(intervalId);
     clearTimeout(inactivityTimer);
+    clearInterval(tileUpdateInterval);
   });
 </script>
 

@@ -19,6 +19,7 @@ model DDayTile {
   color       String   @default("#3b82f6")
   likes       Int      @default(0)
   created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
 
   @@unique([coord_x, coord_y])
 }
