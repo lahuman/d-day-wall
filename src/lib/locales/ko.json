@@ -28,7 +28,7 @@
   },
   "registration_modal": {
     "title": "나의 D-Day 추가하기",
-    "event_title_label": "이벤트 제목",
+    "event_title_label": "이벤트",
     "event_title_placeholder": "예: 제주도 여행",
     "date_label": "날짜",
     "color_label": "타일 색상",

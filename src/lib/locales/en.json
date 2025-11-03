@@ -28,7 +28,7 @@
   },
   "registration_modal": {
     "title": "Add My D-Day",
-    "event_title_label": "Event Title",
+    "event_title_label": "Event",
     "event_title_placeholder": "e.g., Trip to Jeju Island",
     "date_label": "Date",
     "color_label": "Tile Color",

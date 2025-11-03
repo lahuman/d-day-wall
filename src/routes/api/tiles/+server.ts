@@ -45,8 +45,8 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     // Title length validation
-    if (title.length > 50) {
-      return json({ message: 'Title cannot exceed 50 characters' }, { status: 400 });
+    if (title.length > 100) {
+      return json({ message: 'Title cannot exceed 100 characters' }, { status: 400 });
     }
 
     // Coordinate range validation

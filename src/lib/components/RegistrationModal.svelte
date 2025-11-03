@@ -77,7 +77,10 @@
       <form class="space-y-6" on:submit|preventDefault={handleSubmit}>
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-2" for="event-title">{$t('registration_modal.event_title_label')}</label>
-          <input class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="event-title" maxlength="30" name="event-title" placeholder={$t('registration_modal.event_title_placeholder')} type="text" bind:value={title} />
+          <textarea class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition" id="event-title" maxlength="100" name="event-title" placeholder={$t('registration_modal.event_title_placeholder')} rows="3" bind:value={title}></textarea>
+          <div class="text-right text-sm text-gray-500" class:text-red-500={title.length >= 100}>
+            ({title.length}/100)
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-2" for="d-day-date">{$t('registration_modal.date_label')}</label>
