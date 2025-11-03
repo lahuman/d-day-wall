@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
+  import type { PageData } from './$types';
   import Konva from 'konva';
   import RegistrationModal from '$lib/components/RegistrationModal.svelte';
   import LoadingOverlay from '$lib/components/LoadingOverlay.svelte';
@@ -16,6 +17,9 @@
     likes: number;
     created_at: string;
   };
+
+  export let data: PageData;
+  const { sharedTile } = data;
 
   const GRID_COUNT = 60;
   const TILE_BODY_SIZE = 150;
@@ -680,6 +684,9 @@ function jumpToTile(tile: DDayTile) {
       const response = await fetch('/api/tiles');
       if (!response.ok) throw new Error('타일을 불러오는데 실패했습니다.');
       tiles = await response.json();
+      if (sharedTile && !tiles.some(t => t.id === sharedTile.id)) {
+        tiles.push(sharedTile);
+      }
       tiles.forEach(drawTile);
       layer.draw();
     } catch (error) {
@@ -698,25 +705,9 @@ function jumpToTile(tile: DDayTile) {
     stage.position({ x: centerX, y: centerY });
     stage.batchDraw();
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const tileIdToFocus = urlParams.get('tile');
-
-    if (tileIdToFocus) {
-      try {
-        const res = await fetch(`/api/tiles/${tileIdToFocus}`);
-        if (res.ok) {
-          const sharedTile: DDayTile = await res.json();
-          if (!tiles.some(t => t.id === sharedTile.id)) {
-            tiles = [...tiles, sharedTile];
-            drawTile(sharedTile);
-          }
-          
-          await tick();
-          focusOnTile(sharedTile);
-        }
-      } catch (error) {
-        console.error('Failed to fetch shared tile:', error);
-      }
+    if (sharedTile) {
+      await tick();
+      focusOnTile(sharedTile);
     }
 
     updateDDayTiles();
@@ -754,6 +745,19 @@ function jumpToTile(tile: DDayTile) {
     clearTimeout(inactivityTimer);
   });
 </script>
+
+<svelte:head>
+  {#if sharedTile}
+    {@const dday = calculateDday(sharedTile.target_date)}
+    {@const dDayString = dday === 0 ? 'D-Day' : dday > 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}
+    {@const description = `${dDayString} | ${sharedTile.target_date.split('T')[0]} | ❤️ ${sharedTile.likes}`}
+    <title>{sharedTile.title} | D-Day Wall</title>
+    <meta property="og:title" content={sharedTile.title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={`https://dday.day/?tile=${sharedTile.id}`} />
+    <meta property="og:type" content="website" />
+  {/if}
+</svelte:head>
 
 <main class="relative flex h-screen w-full flex-col overflow-hidden font-display text-gray-800 antialiased">
   <header bind:this={headerElement} class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 px-6 py-3 bg-white/80 backdrop-blur-sm md:px-10">

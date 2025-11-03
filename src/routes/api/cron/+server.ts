@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import prisma from '$lib/server/prisma';
+import { prisma } from '$lib/server/prisma';
 import { CRON_SECRET } from '$env/static/private';
 
 // Cron Job to delete old tiles
