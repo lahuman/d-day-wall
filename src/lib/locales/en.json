@@ -21,7 +21,10 @@
     "like_error_message": "Failed to like the tile.",
     "submit_success_title": "Success",
     "submit_success_message": "D-Day has been successfully registered!",
-    "submit_error_title": "Error"
+    "submit_error_title": "Error",
+    "save_canvas_button_title": "Download Canvas",
+    "hide_minimap_button_title": "Hide Minimap",
+    "show_minimap_button_title": "Show Minimap"
   },
   "registration_modal": {
     "title": "Add My D-Day",

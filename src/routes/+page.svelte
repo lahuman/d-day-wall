@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PUBLIC_GRID_COUNT } from '$env/static/public';
   import { onMount, onDestroy, tick } from 'svelte';
   import type { PageData } from './$types';
   import Konva from 'konva';
@@ -23,7 +24,7 @@
   export let data: PageData;
   const { sharedTile } = data;
 
-  const GRID_COUNT = 60;
+  const GRID_COUNT = parseInt(PUBLIC_GRID_COUNT, 10) || 5;
   const TILE_BODY_SIZE = 150;
   const TILE_MARGIN = 20;
   const TILE_CELL_SIZE = TILE_BODY_SIZE + TILE_MARGIN;
@@ -651,10 +652,11 @@ function jumpToTile(tile: DDayTile) {
       lastPollTime = startTime.toISOString();
 
       if (isFullSync) {
-        const newTilesMap = new Map(fetchedTiles.map(t => [t.id, t]));
+        const newTiles = fetchedTiles.filter(t => t.coord_x < GRID_COUNT && t.coord_y < GRID_COUNT);
+        const newTilesMap = new Map(newTiles.map(t => [t.id, t]));
         const currentTilesMap = new Map(tiles.map(t => [t.id, t]));
 
-        for (const newTile of fetchedTiles) {
+        for (const newTile of newTiles) {
           if (!currentTilesMap.has(newTile.id)) {
             drawTile(newTile);
           }
@@ -669,21 +671,23 @@ function jumpToTile(tile: DDayTile) {
             }
           }
         }
-        tiles = fetchedTiles;
+        tiles = newTiles;
       } else {
         const currentTilesMap = new Map(tiles.map(t => [t.id, t]));
         fetchedTiles.forEach(newTile => {
-          if (currentTilesMap.has(newTile.id)) {
-            // Update existing tile
-            const index = tiles.findIndex(t => t.id === newTile.id);
-            if (index !== -1) {
-              tiles[index] = newTile;
-              updateTileNode(newTile);
+          if (newTile.coord_x < GRID_COUNT && newTile.coord_y < GRID_COUNT) {
+            if (currentTilesMap.has(newTile.id)) {
+              // Update existing tile
+              const index = tiles.findIndex(t => t.id === newTile.id);
+              if (index !== -1) {
+                tiles[index] = newTile;
+                updateTileNode(newTile);
+              }
+            } else {
+              // Add new tile
+              tiles = [...tiles, newTile];
+              drawTile(newTile);
             }
-          } else {
-            // Add new tile
-            tiles = [...tiles, newTile];
-            drawTile(newTile);
           }
         });
       }
@@ -863,10 +867,10 @@ function jumpToTile(tile: DDayTile) {
       <h2 class="text-gray-900 text-lg font-bold leading-tight tracking-[-0.015em]">{$t('page.header_title')}</h2>
     </div>
     <div class="flex items-center gap-2">
-      <button class="flex size-10 items-center justify-center rounded-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70" on:click={() => showControls = !showControls}>
+      <button class="flex size-10 items-center justify-center rounded-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70 cursor-pointer" on:click={() => showControls = !showControls} title={$t(showControls ? 'page.hide_minimap_button_title' : 'page.show_minimap_button_title')}>
         <span class="material-symbols-outlined">{showControls ? 'visibility' : 'visibility_off'}</span>
       </button>
-      <button class="flex size-10 items-center justify-center rounded-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70" on:click={saveCanvas}>
+      <button class="flex size-10 items-center justify-center rounded-lg bg-white/50 text-gray-800 backdrop-blur-sm transition-colors hover:bg-white/70 cursor-pointer" on:click={saveCanvas} title={$t('page.save_canvas_button_title')}>
         <span class="material-symbols-outlined">download</span>
       </button>
       <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold leading-normal tracking-[0.015em] transition hover:bg-blue-700" on:click={handleAddDDayClick}>
@@ -896,12 +900,12 @@ function jumpToTile(tile: DDayTile) {
   {#if showControls}
     <div class="absolute bottom-6 right-6 z-20 flex flex-col items-end gap-4">
       <div bind:this={minimapElement} class="w-48 h-48 bg-white/50 border border-gray-300 rounded-lg p-1 backdrop-blur-sm">
-        <div class="relative w-full h-full grid grid-cols-30 grid-rows-30 gap-px">
+        <div class="relative w-full h-full grid gap-px" style="grid-template-columns: repeat({GRID_COUNT}, 1fr); grid-template-rows: repeat({GRID_COUNT}, 1fr);">
           {#each tiles as tile}
             {@const dday = calculateDday(tile.target_date)}
             <div
               class="rounded-full {dday === 0 ? 'd-day-minimap-tile' : ''}"
-              style="grid-column: {Math.floor(tile.coord_x / 2) + 1}; grid-row: {Math.floor(tile.coord_y / 2) + 1}; background-color: {dday < 0 ? '#f1f3f5' : dday === 0 ? '#e74c3c' : tile.color};"
+              style="grid-column: {tile.coord_x + 1}; grid-row: {tile.coord_y + 1}; background-color: {dday < 0 ? '#f1f3f5' : dday === 0 ? '#e74c3c' : tile.color};"
             ></div>
           {/each}
           <div 

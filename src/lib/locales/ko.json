@@ -21,7 +21,10 @@
     "like_error_message": "좋아요에 실패했습니다.",
     "submit_success_title": "성공",
     "submit_success_message": "D-Day가 성공적으로 등록되었습니다!",
-    "submit_error_title": "오류"
+    "submit_error_title": "오류",
+    "save_canvas_button_title": "캔버스 다운로드",
+    "hide_minimap_button_title": "미니맵 숨기기",
+    "show_minimap_button_title": "미니맵 보이기"
   },
   "registration_modal": {
     "title": "나의 D-Day 추가하기",
